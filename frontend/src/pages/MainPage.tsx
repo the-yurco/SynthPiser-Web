@@ -4,7 +4,13 @@ type Props = {}
 
 const MainPage = (props: Props) => {
   return (
-    <div>MainPage</div>
+    <div className='main-page'>
+        <div className="main-content">
+            <div className="logo">
+                <h1>SynthPiser</h1>
+            </div>
+        </div>
+    </div>
   )
 }
 
