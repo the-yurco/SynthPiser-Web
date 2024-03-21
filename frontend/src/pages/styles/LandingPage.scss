@@ -1,0 +1,47 @@
+.landing-page{
+    width: 100%;
+    height: 95%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    .landing-content{
+        height: 50%;
+        background: url('../../../public/assets/title-wave.svg') no-repeat;
+        background-position:top 10% right 50%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        width: 70%;
+        .logo{
+            width: 50%;
+            h1{
+                font-family: Encapsul;
+                font-size: 7.5rem;
+                background: rgb(255,253,239);
+                background: linear-gradient(90deg, rgba(255,253,239,1) 0%, rgba(103,155,255,1) 65%, rgba(255,136,193,1) 95%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+        }
+        .magic{
+            width: 55%;
+            font-family: Lexend Zetta;
+            font-size: 1.25rem;
+            margin-bottom: 1.75rem;
+        }
+        .enter-btn{
+            font-family: Lexend Zetta;
+            background-color: rgba(103, 156, 255,0.15);
+            border: 1px solid #679BFF;
+            border-radius: 8px;
+            color: #679BFF;
+            padding: .5rem 2.5rem;
+            transition: .3s;
+            &:hover{
+                background-color: rgba(103, 156, 255,0.4);
+            }
+        }
+    }
+}

@@ -1,0 +1,15 @@
+.main-page{
+    .main-content{
+        .logo{
+            h1{
+                width: 30%;
+                font-family: Encapsul;
+                font-size: 7.5rem;
+                background: rgb(255,253,239);
+                background: linear-gradient(90deg, rgba(255,253,239,1) 0%, rgba(103,155,255,1) 65%, rgba(255,136,193,1) 95%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }
+        }
+    }
+}
