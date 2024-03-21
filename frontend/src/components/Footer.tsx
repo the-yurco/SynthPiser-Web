@@ -2,8 +2,8 @@ import React from 'react'
 
 const Footer = () => {
   return (
-    <div>
-        <p className='copy'>&copy; Created by Yurco & Rondon</p>
+    <div className="footer">
+        <p className='copy'><span className='copy-icon'>&copy;</span> Created by Yurco & Rondon</p>
     </div>
   )
 }

@@ -31,8 +31,18 @@ body{
   color: #FFFDEF;
 }
 
-.copy{
-  font-family: Lexend Zetta;
-  font-size: 0.625;
-  color: #FFFDEF;
+.footer{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  justify-self: flex-end;
+  .copy{
+    font-family: Lexend Zetta;
+    justify-self: flex-end;
+    font-size: 0.625rem;
+    color: #FFFDEF;
+    .copy-icon{
+      font-size: 1rem;
+    }
+  }
 }
