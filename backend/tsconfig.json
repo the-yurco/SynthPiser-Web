@@ -1,9 +1,9 @@
 {
     "compilerOptions": {
-        "target": "es5",
-        "module": "commonjs",
-        "outDir": "./dist",
-        "strict": true,
-        "esModuleInterop": true
-    }
-}
+      "target": "es6",
+      "module": "commonjs",
+      "outDir": "dist",
+      "esModuleInterop": true
+    },
+    "include": ["src"]
+  }
