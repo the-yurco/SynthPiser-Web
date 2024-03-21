@@ -1,0 +1,38 @@
+.landing-page{
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    .landing-content{
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        width: 35%;
+        .logo{
+            h1{
+                font-family: Encapsul;
+                font-size: 7.5rem;
+            }
+        }
+        .magic{
+            font-family: Lexend Zetta;
+            font-size: 1.25rem;
+            margin-bottom: 1.75rem;
+        }
+        .enter-btn{
+            font-family: Lexend Zetta;
+            background-color: rgba(103, 156, 255,0.15);
+            border: 1px solid #679BFF;
+            border-radius: 8px;
+            color: #679BFF;
+            padding: .5rem 2.5rem;
+            transition: .3s;
+            &:hover{
+                background-color: rgba(103, 156, 255,0.4);
+            }
+        }
+    }
+}
