@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import Draggable from 'react-draggable';
-import { DraggableEvent, DraggableData } from 'react-draggable';
 
 interface Sound {
 	id: number;
@@ -14,6 +12,7 @@ interface Sound {
 const MainPage = () => {
 	const [sounds, setSounds] = useState<Sound[]>([]);
 	const [query, setQuery] = useState<string>('Drums');
+	const [selectedSound, setSelectedSound] = useState<Sound | null>(null);
 	const [assignedSounds, setAssignedSounds] = useState<(Sound | null)[]>(
 		Array(16).fill(null)
 	);
@@ -41,8 +40,9 @@ const MainPage = () => {
 		}
 	};
 
-	const handleSoundClick = (previewUrl: string) => {
-		const audio = new Audio(previewUrl);
+	const handleSoundSelect = (sound: Sound) => {
+		setSelectedSound(sound);
+		const audio = new Audio(sound.previews['preview-hq-mp3']);
 		audio.play();
 	};
 
@@ -51,43 +51,17 @@ const MainPage = () => {
 		fetchSounds(query);
 	};
 
-	const handleDragStop = (
-		index: number,
-		event: MouseEvent | TouchEvent | DraggableEvent,
-		data: DraggableData
-	) => {
-		const sound = sounds[index];
-		const buttonIndex = getButtonIndex(data.x, data.y);
-		if (buttonIndex !== -1) {
+	const handleButtonSoundClick = (sound: Sound | null, index: number) => {
+		if (selectedSound) {
 			const newAssignedSounds = [...assignedSounds];
-			newAssignedSounds[buttonIndex] = sound;
+			newAssignedSounds[index] = selectedSound;
 			setAssignedSounds(newAssignedSounds);
 		}
 	};
 
-	const getButtonIndex = (x: number, y: number): number => {
-		// Logic to determine which button the sound was dropped onto
-		// This logic depends on your UI layout, you may need to adjust it accordingly
-		// For example, you can use coordinates to determine the button index
-		// Here, I'm assuming a simple grid layout with 4 buttons per row
-		const row = Math.floor(y / buttonHeight);
-		const col = Math.floor(x / buttonWidth);
-		const index = row * 4 + col;
-		if (index >= 0 && index < 16) {
-			return index;
-		}
-		return -1;
+	const handleResetSounds = () => {
+		setAssignedSounds(Array(16).fill(null));
 	};
-
-	const handleButtonSoundClick = (sound: Sound | null) => {
-		if (sound) {
-			const audio = new Audio(sound.previews['preview-hq-mp3']);
-			audio.play();
-		}
-	};
-
-	const buttonWidth = 100; // Adjust this value based on your button width
-	const buttonHeight = 50; // Adjust this value based on your button height
 
 	return (
 		<div className="main-page">
@@ -106,29 +80,28 @@ const MainPage = () => {
 				</form>
 				<div className="sounds">
 					{sounds.map((sound, index) => (
-						<Draggable
+						<button
 							key={sound.id}
-							onStop={(e, data) => handleDragStop(index, e, data)}
+							className={`sound-button ${
+								selectedSound === sound ? 'selected' : ''
+							}`}
+							onClick={() => handleSoundSelect(sound)}
 						>
-							<button
-								className="sound-button"
-								onClick={() =>
-									handleSoundClick(sound.previews['preview-hq-mp3'])
-								}
-							>
-								<img src="/assets/note.png" alt="" height={20} width={20} />
-							</button>
-						</Draggable>
+							<img src="/assets/note.png" alt="" height={20} width={20} />
+						</button>
 					))}
 				</div>
+				<button className="reset-button" onClick={handleResetSounds}>
+					Reset
+				</button>
 				<div className="embedded-keyboard">
 					{assignedSounds.map((sound, index) => (
 						<button
 							key={index}
-							className="embedded-key"
-							onClick={() => handleButtonSoundClick(sound)}
+							className={`embedded-key ${sound ? 'assigned' : 'empty'}`}
+							onClick={() => handleButtonSoundClick(selectedSound, index)}
 						>
-							<div>{sound ? sound.name : 'Empty'}</div>
+							<div></div>
 						</button>
 					))}
 				</div>

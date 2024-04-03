@@ -10,7 +10,7 @@
 		max-width: 1000px;
 		display: flex;
 		flex-direction: column;
-		gap: 3rem;
+		gap: 2rem;
 		justify-content: center;
 		align-items: center;
 		.logo {
@@ -81,11 +81,28 @@
 				font-size: 0.5rem;
 				box-shadow: rgba(0, 0, 0, 0.19) 0px 10px 20px,
 					rgba(0, 0, 0, 0.23) 0px 6px 6px;
+				border: none;
 				&:hover {
 					background-color: rgba(103, 156, 255, 0.4);
 				}
+				&:focus {
+					border: 1px solid rgba(103, 156, 255, 0.15);
+					background-color: rgba(0, 0, 0, 0.1);
+				}
 				display: grid;
 				place-items: center;
+			}
+		}
+		.reset-button {
+			font-family: Lexend Zetta;
+			background-color: rgba(103, 156, 255, 0.15);
+			border: 1px solid #679bff;
+			border-radius: 8px;
+			color: #679bff;
+			padding: 0.2rem 1rem;
+			transition: 0.3s;
+			&:hover {
+				background-color: rgba(103, 156, 255, 0.4);
 			}
 		}
 		.embedded-keyboard {
@@ -93,7 +110,7 @@
 			grid-template-columns: repeat(8, minmax(100px, 1fr));
 			grid-auto-rows: minmax(50px, auto);
 			gap: 1rem;
-			padding: 2rem;
+			padding: 0 2rem 2rem;
 			border-radius: 1rem;
 			.embedded-key {
 				height: 10rem;
@@ -114,8 +131,33 @@
 				div {
 					width: 2rem;
 					height: 0.7rem;
-					background-color: rgba(0, 0, 0, 0.19);
 					border-radius: 1rem;
+				}
+			}
+			.embedded-key.assigned {
+				div {
+					background-color: rgba(103, 156, 255, 0.15);
+					transition: background-color 0.3s, transform 0.5s;
+					animation: glow 2s infinite alternate;
+					box-shadow: 0 0 20px rgba(103, 156, 255, 0.4);
+				}
+			}
+
+			@keyframes glow {
+				0% {
+					background-color: rgba(103, 156, 255, 0.15);
+					transform: scale(1);
+				}
+				100% {
+					background-color: rgba(103, 156, 255, 0);
+					transform: scale(1.1);
+				}
+			}
+
+			.embedded-key.empty {
+				div {
+					background-color: rgba(0, 0, 0, 0.19);
+					transition: all 0.3s;
 				}
 			}
 		}
