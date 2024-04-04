@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface Sound {
 	id: number;
@@ -21,6 +21,32 @@ const MainPage = () => {
 	const [assignedSounds, setAssignedSounds] = useState<(Sound | null)[]>(
 		Array(16).fill(null)
 	);
+
+	const socket = useRef<WebSocket | null>(null);
+
+    useEffect(() => {
+        // Initialize the WebSocket connection
+        socket.current = new WebSocket('ws://192.168.0.201:8765');
+
+        socket.current.onopen = () => {
+            console.log('WebSocket connection established.');
+        };
+
+        socket.current.onmessage = (event : any) => {
+            console.log('Received message:', event.data);
+        };
+
+        socket.current.onclose = () => {
+            console.log('WebSocket connection closed.');
+        };
+
+        // Clean up WebSocket connection when component unmounts
+        return () => {
+            if (socket.current) {
+                socket.current.close();
+            }
+        };
+    }, []);
 
 	useEffect(() => {
 		fetchSounds(query);
@@ -57,13 +83,23 @@ const MainPage = () => {
 		fetchSounds(query);
 	};
 
-	const handleButtonSoundClick = (sound: Sound | null, index: number) => {
-		if (selectedSound) {
-			const newAssignedSounds = [...assignedSounds];
-			newAssignedSounds[index] = selectedSound;
-			setAssignedSounds(newAssignedSounds);
+	const buttonPins = [4, 17, 27, 22, 18, 23, 24, 25, 5, 6, 13, 19, 26, 16, 20, 21];
+
+
+	const handleButtonSoundClick = (sound: Sound, index: number) => {
+		const newAssignedSounds = [...assignedSounds];
+		newAssignedSounds[index] = sound;
+		const audio = sound.previews['preview-hq-mp3'];
+		setAssignedSounds(newAssignedSounds);
+	
+		// Send the selected sound to the backend
+		if (sound && socket.current) {
+			const pin = buttonPins[index];
+			console.log('Sending sound to backend:', { pin, sound })
+			socket.current.send(JSON.stringify({ type: 'assign_sound', pin, sound }));
 		}
 	};
+	
 
 	const handleResetSounds = () => {
 		setAssignedSounds(Array(16).fill(null));
@@ -106,7 +142,7 @@ const MainPage = () => {
 						<button
 							key={index}
 							className={`embedded-key ${sound ? 'assigned' : 'empty'}`}
-							onClick={() => handleButtonSoundClick(selectedSound, index)}
+							onClick={() => selectedSound && handleButtonSoundClick(selectedSound, index)}
 						>
 							<div></div>
 						</button>
