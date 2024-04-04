@@ -1,10 +1,12 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
+import WebSocketComponent from '../components/Websocket'
 
 const LandingPage = () => {
     const navigate = useNavigate()
   return (
     <div className='landing-page'>
+        <WebSocketComponent/>
         <div className="landing-content">
             <div className="logo">
                 <h1>SynthPiser</h1>

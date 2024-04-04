@@ -3,6 +3,11 @@ import React, { useState, useEffect } from 'react';
 interface Sound {
 	id: number;
 	name: string;
+	bitrate:string;
+	images:{
+		'waveform_m':string;
+		'spectral_l':string;
+	}
 	previews: {
 		'preview-hq-mp3': string;
 	};
@@ -26,7 +31,7 @@ const MainPage = () => {
 			const apiKey = 'Aj9x06vq60VC37YLo9psCPwzvEIyTu0eBQfphtoz';
 			const queryParams = new URLSearchParams({
 				query: searchQuery,
-				fields: 'id,name,previews,tags',
+				fields: 'id,name,bitrate,images,previews,tags',
 				token: apiKey
 			});
 			const response = await fetch(
@@ -35,6 +40,7 @@ const MainPage = () => {
 			const data = await response.json();
 			const randomPianoSounds = data.results.slice(0, 16);
 			setSounds(randomPianoSounds);
+			console.log(randomPianoSounds);
 		} catch (error) {
 			console.error('Error fetching sounds:', error);
 		}
@@ -87,7 +93,8 @@ const MainPage = () => {
 							}`}
 							onClick={() => handleSoundSelect(sound)}
 						>
-							<img src="/assets/note.png" alt="" height={20} width={20} />
+							<img src={sound.images.waveform_m} alt="" height={75} width={75} />
+							<p>{sound.name}</p>
 						</button>
 					))}
 				</div>
