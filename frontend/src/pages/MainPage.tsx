@@ -98,11 +98,13 @@ const MainPage = () => {
 			console.log('Sending sound to backend:', { pin, sound })
 			socket.current.send(JSON.stringify({ type: 'assign_sound', pin, sound }));
 		}
+		setSelectedSound(null);
 	};
 	
 
 	const handleResetSounds = () => {
 		setAssignedSounds(Array(16).fill(null));
+		setSelectedSound(null);
 	};
 
 	return (
@@ -141,7 +143,7 @@ const MainPage = () => {
 					{assignedSounds.map((sound, index) => (
 						<button
 							key={index}
-							className={`embedded-key ${sound ? 'assigned' : 'empty'}`}
+							className={`embedded-key ${sound ? 'assigned' : selectedSound ? 'glow empty' : 'empty'} `}
 							onClick={() => selectedSound && handleButtonSoundClick(selectedSound, index)}
 						>
 							<div></div>
