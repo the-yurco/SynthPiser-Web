@@ -21,6 +21,8 @@ const MainPage = () => {
 	const [assignedSounds, setAssignedSounds] = useState<(Sound | null)[]>(
 		Array(16).fill(null)
 	);
+	const [leftSliderValue, setLeftSliderValue] = useState<number>(50);
+    const [rightSliderValue, setRightSliderValue] = useState<number>(50);
 
 	const socket = useRef<WebSocket | null>(null);
 
@@ -122,19 +124,45 @@ const MainPage = () => {
 						className="search-bar"
 					/>
 				</form>
-				<div className="sounds">
-					{sounds.map((sound, index) => (
-						<button
-							key={sound.id}
-							className={`sound-button ${
-								selectedSound === sound ? 'selected' : ''
-							}`}
-							onClick={() => handleSoundSelect(sound)}
-						>
-							<img src={sound.images.waveform_m} alt="" height={75} width={75} />
-							<p>{sound.name}</p>
-						</button>
-					))}
+				<div className="sounds-wrapper">
+					<div className="slider">
+							<label htmlFor="left-slider">Left Slider:</label>
+							<input
+								type="range"
+								id="left-slider"
+								min="0"
+								max="100"
+								value={leftSliderValue}
+								onChange={(e) => setLeftSliderValue(parseInt(e.target.value))}
+							/>
+							<span>{leftSliderValue}</span>
+					</div>
+					<div className="sounds">
+						{sounds.map((sound, index) => (
+							<button
+								key={sound.id}
+								className={`sound-button ${
+									selectedSound === sound ? 'selected' : ''
+								}`}
+								onClick={() => handleSoundSelect(sound)}
+							>
+								<img src={sound.images.waveform_m} alt="" height={75} width={75} />
+								{/* <p>{sound.name}</p> */}
+							</button>
+						))}
+					</div>
+					<div className="slider">
+                        <label htmlFor="right-slider">Right Slider:</label>
+                        <input
+                            type="range"
+                            id="right-slider"
+                            min="0"
+                            max="100"
+                            value={rightSliderValue}
+                            onChange={(e) => setRightSliderValue(parseInt(e.target.value))}
+                        />
+                        <span>{rightSliderValue}</span>
+                    </div>
 				</div>
 				<button className="reset-button" onClick={handleResetSounds}>
 					Reset
