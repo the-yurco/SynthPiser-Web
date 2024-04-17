@@ -1,11 +1,11 @@
 .main-page {
-	width: 100%;
-	height: 100%;
+	max-width: 100%;
+	max-height: 100%;
 	display: flex;
 	flex-direction: column;
 	justify-content: center;
 	align-items: center;
-	padding-top: 20px;
+	padding: 2rem 0 0 0;
 	.content {
 		max-width: 1000px;
 		display: flex;
@@ -31,6 +31,7 @@
 			}
 		}
 		.search-bar {
+			font-family: Lexend Zetta;
 			padding: 0.3rem 1rem;
 			color: #fff;
 			border-radius: 8px;
@@ -51,49 +52,84 @@
 			}
 		}
 
-		.sounds-wrapper{
-
+		.sounds-wrapper {
 			display: flex;
 			justify-content: center;
 			align-items: center;
 			gap: 3rem;
 
-            .slider {
-                /* Adjusted styles for vertical orientation */
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 5px;
-                color: #fff;
+			.slider {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 10px;
+				color: #fff;
 
-                input[type="range"] {
-                    -webkit-appearance: none;
-                    width: 10px;
-                    height: 200px;
-                    writing-mode: vertical-lr;
-                    background: linear-gradient(to bottom, #000000 20%, #3e5d99 0%);
-                    background: linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, #3e5c9900 100%);
-                    border: none;
-                    border-radius: 5px;
-                    cursor: pointer;
-                }
+				label,
+				span {
+					font-family: Lexend Zetta;
+					width: 10rem;
+					text-align: center;
+					color: rgba(103, 155, 255, 0.7);
+				}
 
-                input[type="range"]::-webkit-slider-thumb {
-                    -webkit-appearance: none;
-                    width: 20px;
-                    height: 20px;
-                    background-color: #679bff;
-                    border-radius: 50%;
-                    border: 2px solid #fff;
-                    cursor: pointer;
-                    transition: background-color 0.3s;
-                    transform: rotate(90deg);
-                }
+				input[type='range'] {
+					-webkit-appearance: none;
+					width: 20px;
+					height: 300px;
+					writing-mode: vertical-lr;
+					background: linear-gradient(
+						to bottom,
+						rgba(103, 156, 255, 0.15),
+						rgba(103, 156, 255, 0.15)
+					);
+					box-shadow: rgba(0, 0, 0, 0.19) 0px 10px 20px,
+						rgba(0, 0, 0, 0.23) 0px 6px 6px;
+					border: none;
+					border-radius: 5px;
+					cursor: pointer;
 
-                input[type="range"]::-webkit-slider-thumb:hover {
-                    background-color: #5175c4;
-                }
-            }
+					&::-webkit-slider-thumb {
+						-webkit-appearance: none;
+						width: 10px;
+						height: 30px;
+						position: relative;
+						background-color: transparent;
+						cursor: pointer;
+
+						&::after {
+							content: '';
+							position: absolute;
+							top: 0;
+							left: 0;
+							width: 100%;
+							height: 100%;
+							background-color: #679bff;
+							border-radius: 5px;
+							border: 2px solid #fff;
+							transition: background-color 0.3s;
+						}
+
+						&:hover::after {
+							background-color: #5175c4;
+						}
+					}
+				}
+
+				input::-moz-range-thumb {
+					width: 30px;
+					height: 50px;
+					background: #3e5d99;
+					cursor: pointer;
+					border: 1px solid #679bff;
+					border-radius: 4px;
+					transition: all 0.3s;
+
+					&:hover {
+						background-color: #5175c4;
+					}
+				}
+			}
 
 			.sounds {
 				display: grid;
@@ -181,10 +217,11 @@
 			}
 			.embedded-key.assigned {
 				div {
-					background-color: rgba(103, 156, 255, 0.15);
+					//background-color: rgba(103, 156, 255, 0.15);
+					background-color: rgba($color: #679bff, $alpha: 1);
 					transition: background-color 0.3s, transform 0.5s;
-					animation: glow 2s infinite alternate;
-					box-shadow: 0 0 20px rgba(103, 156, 255, 0.4);
+					//animation: glow 2s infinite alternate;
+					//box-shadow: 0 0 20px rgba(103, 156, 255, 0.4);
 				}
 			}
 
@@ -203,6 +240,7 @@
 				div {
 					background-color: rgba(0, 0, 0, 0.19);
 					transition: all 0.3s;
+					box-shadow: rgba($color: #000000, $alpha: 1);
 				}
 			}
 		}
@@ -211,16 +249,17 @@
 
 @keyframes glow {
 	0% {
-	  box-shadow: 0 0 1px #3e5d99, 0 0 2px #3e5d99, 0 0 3px #3e5d99, 0 0 4px #679bff, 0 0 7px #679bff, 0 0 8px #679bff, 0 0 10px #679bff, 0 0 15px #679bff;
-	}
-	50% {
-	  box-shadow: 0 0 2px #3e5d99, 0 0 3px #3e5d99, 0 0 4px #679bff, 0 0 7px #679bff, 0 0 8px #679bff, 0 0 10px #679bff, 0 0 15px #679bff, 0 0 20px #679bff;
+		box-shadow: 0 0 1px #3e5d99, 0 0 2px #3e5d99, 0 0 3px #3e5d99,
+			0 0 4px #679bff, 0 0 7px #679bff, 0 0 8px #679bff, 0 0 10px #679bff,
+			0 0 15px #679bff;
 	}
 	100% {
-	  box-shadow: 0 0 1px #3e5d99, 0 0 2px #3e5d99, 0 0 3px #3e5d99, 0 0 4px #679bff, 0 0 7px #679bff, 0 0 8px #679bff, 0 0 10px #679bff, 0 0 15px #679bff;
+		box-shadow: 0 0 1px #3e5d99, 0 0 2px #3e5d99, 0 0 3px #3e5d99,
+			0 0 4px #679bff, 0 0 7px #679bff, 0 0 8px #679bff, 0 0 10px #679bff,
+			0 0 15px #679bff;
 	}
-  }
-  
-  .glow {
-	animation: glow 1.5s infinite alternate;
-  }  
+}
+
+.glow {
+	animation: glow 1s infinite alternate ease-in-out;
+}

@@ -3,11 +3,11 @@ import React, { useState, useEffect, useRef } from 'react';
 interface Sound {
 	id: number;
 	name: string;
-	bitrate:string;
-	images:{
-		'waveform_m':string;
-		'spectral_l':string;
-	}
+	bitrate: string;
+	images: {
+		waveform_m: string;
+		spectral_l: string;
+	};
 	previews: {
 		'preview-hq-mp3': string;
 	};
@@ -21,34 +21,34 @@ const MainPage = () => {
 	const [assignedSounds, setAssignedSounds] = useState<(Sound | null)[]>(
 		Array(16).fill(null)
 	);
-	const [leftSliderValue, setLeftSliderValue] = useState<number>(50);
-    const [rightSliderValue, setRightSliderValue] = useState<number>(50);
+	const [leftSliderValue, setLeftSliderValue] = useState<number>(0);
+	const [rightSliderValue, setRightSliderValue] = useState<number>(0);
 
 	const socket = useRef<WebSocket | null>(null);
 
-    useEffect(() => {
-        // Initialize the WebSocket connection
-        socket.current = new WebSocket('ws://192.168.0.201:8765');
+	useEffect(() => {
+		// Initialize the WebSocket connection
+		socket.current = new WebSocket('ws://192.168.0.201:8765');
 
-        socket.current.onopen = () => {
-            console.log('WebSocket connection established.');
-        };
+		socket.current.onopen = () => {
+			console.log('WebSocket connection established.');
+		};
 
-        socket.current.onmessage = (event : any) => {
-            console.log('Received message:', event.data);
-        };
+		socket.current.onmessage = (event: any) => {
+			console.log('Received message:', event.data);
+		};
 
-        socket.current.onclose = () => {
-            console.log('WebSocket connection closed.');
-        };
+		socket.current.onclose = () => {
+			console.log('WebSocket connection closed.');
+		};
 
-        // Clean up WebSocket connection when component unmounts
-        return () => {
-            if (socket.current) {
-                socket.current.close();
-            }
-        };
-    }, []);
+		// Clean up WebSocket connection when component unmounts
+		return () => {
+			if (socket.current) {
+				socket.current.close();
+			}
+		};
+	}, []);
 
 	useEffect(() => {
 		fetchSounds(query);
@@ -85,24 +85,24 @@ const MainPage = () => {
 		fetchSounds(query);
 	};
 
-	const buttonPins = [4, 17, 27, 22, 18, 23, 24, 25, 5, 6, 13, 19, 26, 16, 20, 21];
-
+	const buttonPins = [
+		4, 17, 27, 22, 18, 23, 24, 25, 5, 6, 13, 19, 26, 16, 20, 21
+	];
 
 	const handleButtonSoundClick = (sound: Sound, index: number) => {
 		const newAssignedSounds = [...assignedSounds];
 		newAssignedSounds[index] = sound;
 		const audio = sound.previews['preview-hq-mp3'];
 		setAssignedSounds(newAssignedSounds);
-	
+
 		// Send the selected sound to the backend
 		if (sound && socket.current) {
 			const pin = buttonPins[index];
-			console.log('Sending sound to backend:', { pin, sound })
+			console.log('Sending sound to backend:', { pin, sound });
 			socket.current.send(JSON.stringify({ type: 'assign_sound', pin, sound }));
 		}
 		setSelectedSound(null);
 	};
-	
 
 	const handleResetSounds = () => {
 		setAssignedSounds(Array(16).fill(null));
@@ -126,16 +126,16 @@ const MainPage = () => {
 				</form>
 				<div className="sounds-wrapper">
 					<div className="slider">
-							<label htmlFor="left-slider">Left Slider:</label>
-							<input
-								type="range"
-								id="left-slider"
-								min="0"
-								max="100"
-								value={leftSliderValue}
-								onChange={(e) => setLeftSliderValue(parseInt(e.target.value))}
-							/>
-							<span>{leftSliderValue}</span>
+						<label htmlFor="left-slider">Reverb</label>
+						<input
+							type="range"
+							id="left-slider"
+							min="-20"
+							max="20"
+							value={leftSliderValue}
+							onChange={(e) => setLeftSliderValue(parseInt(e.target.value))}
+						/>
+						<span>{leftSliderValue}</span>
 					</div>
 					<div className="sounds">
 						{sounds.map((sound, index) => (
@@ -146,23 +146,28 @@ const MainPage = () => {
 								}`}
 								onClick={() => handleSoundSelect(sound)}
 							>
-								<img src={sound.images.waveform_m} alt="" height={75} width={75} />
+								<img
+									src={sound.images.waveform_m}
+									alt=""
+									height={75}
+									width={75}
+								/>
 								{/* <p>{sound.name}</p> */}
 							</button>
 						))}
 					</div>
 					<div className="slider">
-                        <label htmlFor="right-slider">Right Slider:</label>
-                        <input
-                            type="range"
-                            id="right-slider"
-                            min="0"
-                            max="100"
-                            value={rightSliderValue}
-                            onChange={(e) => setRightSliderValue(parseInt(e.target.value))}
-                        />
-                        <span>{rightSliderValue}</span>
-                    </div>
+						<label htmlFor="right-slider">Distortion</label>
+						<input
+							type="range"
+							id="right-slider"
+							min="-20"
+							max="20"
+							value={rightSliderValue}
+							onChange={(e) => setRightSliderValue(parseInt(e.target.value))}
+						/>
+						<span>{rightSliderValue}</span>
+					</div>
 				</div>
 				<button className="reset-button" onClick={handleResetSounds}>
 					Reset
@@ -171,8 +176,12 @@ const MainPage = () => {
 					{assignedSounds.map((sound, index) => (
 						<button
 							key={index}
-							className={`embedded-key ${sound ? 'assigned' : selectedSound ? 'glow empty' : 'empty'} `}
-							onClick={() => selectedSound && handleButtonSoundClick(selectedSound, index)}
+							className={`embedded-key ${
+								sound ? 'assigned' : selectedSound ? ' empty' : 'empty'
+							} `}
+							onClick={() =>
+								selectedSound && handleButtonSoundClick(selectedSound, index)
+							}
 						>
 							<div></div>
 						</button>
