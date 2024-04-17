@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { FaPlay, FaPause, FaRedo } from 'react-icons/fa';
 
 interface Sound {
 	id: number;
@@ -23,6 +24,10 @@ const MainPage = () => {
 	);
 	const [leftSliderValue, setLeftSliderValue] = useState<number>(0);
 	const [rightSliderValue, setRightSliderValue] = useState<number>(0);
+	const [timerRunning, setTimerRunning] = useState<boolean>(false);
+	const [timerValue, setTimerValue] = useState<number>(0);
+	const [isPlaying, setIsPlaying] = useState<boolean>(false);
+	const timerRef = useRef<number | null>(null);
 
 	const socket = useRef<WebSocket | null>(null);
 
@@ -109,6 +114,34 @@ const MainPage = () => {
 		setSelectedSound(null);
 	};
 
+	const togglePlayPause = () => {
+		setIsPlaying(!isPlaying);
+		if (!timerRunning) {
+			setTimerValue(0);
+			setTimerRunning(true);
+			timerRef.current = window.setInterval(() => {
+				setTimerValue((prevValue) => {
+					if (prevValue >= 10) {
+						setTimerRunning(false);
+						window.clearInterval(timerRef.current!);
+						return 0;
+					}
+					return prevValue + 1;
+				});
+			}, 1000);
+		} else {
+			setTimerRunning(false);
+			window.clearInterval(timerRef.current!);
+		}
+	};
+
+	const resetAudio = () => {
+		setSelectedSound(null);
+	};
+
+	const playPauseButton =
+		timerValue > 10 ? <FaPlay /> : isPlaying ? <FaPause /> : <FaPlay />;
+
 	return (
 		<div className="main-page">
 			<div className="content">
@@ -167,6 +200,24 @@ const MainPage = () => {
 							onChange={(e) => setRightSliderValue(parseInt(e.target.value))}
 						/>
 						<span>{rightSliderValue}</span>
+					</div>
+				</div>
+
+				<div className="beat-controls">
+					<div className="visualizer">
+						<div className="timer-wrapper">
+							<div className="timer">{timerValue}</div>
+						</div>
+						<div
+							className="timer-line"
+							style={{ width: `${timerValue * 10}%` }}
+						/>
+					</div>
+					<div className="beat-buttons">
+						<button onClick={togglePlayPause}>{playPauseButton}</button>
+						<button onClick={resetAudio}>
+							<FaRedo />
+						</button>
 					</div>
 				</div>
 				<button className="reset-button" onClick={handleResetSounds}>
