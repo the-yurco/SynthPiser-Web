@@ -91,7 +91,7 @@ const MainPage = () => {
 	};
 
 	const buttonPins = [
-		4, 17, 27, 22, 18, 23, 24, 25, 5, 6, 13, 19, 26, 16, 20, 21
+		5, 6, 13, 19, 26, 16, 20, 21, 4 , 17, 27, 22 ,24 ,25 ,23, 18
 	];
 
 	const handleButtonSoundClick = (sound: Sound, index: number) => {

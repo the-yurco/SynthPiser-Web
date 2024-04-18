@@ -119,7 +119,8 @@
 					}
 				}
 
-				input::-moz-range-thumb {
+				/* For Mozilla Firefox */
+				input[type="range"]::-moz-range-thumb {
 					width: 30px;
 					height: 50px;
 					background: #3e5d99;
@@ -127,11 +128,42 @@
 					border: 1px solid #679bff;
 					border-radius: 8px;
 					transition: all 0.3s;
-
-					&:hover {
-						background-color: #5175c4;
-					}
 				}
+
+				input[type="range"]::-moz-range-thumb:hover {
+					background-color: #5175c4;
+				}
+
+				/* For WebKit-based browsers (Chrome, Safari, etc.) */
+				input[type="range"]::-webkit-slider-thumb {
+					width: 30px;
+					height: 50px;
+					background: #3e5d99;
+					cursor: pointer;
+					border: 1px solid #679bff;
+					border-radius: 8px;
+					transition: all 0.3s;
+				}
+
+				input[type="range"]::-webkit-slider-thumb:hover {
+					background-color: #5175c4;
+				}
+
+				/* For Internet Explorer and Microsoft Edge */
+				input[type="range"]::-ms-thumb {
+					width: 30px;
+					height: 50px;
+					background: #3e5d99;
+					cursor: pointer;
+					border: 1px solid #679bff;
+					border-radius: 8px;
+					transition: all 0.3s;
+				}
+
+				input[type="range"]::-ms-thumb:hover {
+					background-color: #5175c4;
+				}
+
 			}
 
 			.sounds {
