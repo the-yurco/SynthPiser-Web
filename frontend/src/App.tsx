@@ -15,7 +15,7 @@ function App() {
             {/* <Route path="*" element={<NoMatch />} /> */}
           {/* </Route> */}
         </Routes>
-        <Footer />
+        
     </Router>
     </div>
   );

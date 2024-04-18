@@ -182,8 +182,8 @@ const MainPage = () => {
 								<img
 									src={sound.images.waveform_m}
 									alt=""
-									height={75}
-									width={75}
+									height={35}
+									width={35}
 								/>
 								{/* <p>{sound.name}</p> */}
 							</button>
@@ -218,11 +218,12 @@ const MainPage = () => {
 						<button onClick={resetAudio}>
 							<FaRedo />
 						</button>
+							<button className="reset-button" onClick={handleResetSounds}>
+						Reset
+					</button>
 					</div>
 				</div>
-				<button className="reset-button" onClick={handleResetSounds}>
-					Reset
-				</button>
+			
 				<div className="embedded-keyboard">
 					{assignedSounds.map((sound, index) => (
 						<button

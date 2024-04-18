@@ -1,10 +1,12 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import WebSocketComponent from '../components/Websocket';
+import Footer from '../components/Footer'
 
 const LandingPage = () => {
 	const navigate = useNavigate();
 	return (
+		<>
 		<div className="landing-page">
 			<div className="landing-content">
 				<div className="logo">
@@ -24,6 +26,8 @@ const LandingPage = () => {
 				<WebSocketComponent />
 			</div>
 		</div>
+		<Footer />
+		</>
 	);
 };
 
