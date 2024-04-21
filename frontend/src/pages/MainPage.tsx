@@ -30,6 +30,7 @@ const MainPage = () => {
 	const timerRef = useRef<number | null>(null);
 
 	const socket = useRef<WebSocket | null>(null);
+	const audioRef = useRef<HTMLAudioElement | null>(null);
 
 	useEffect(() => {
 		// Initialize the WebSocket connection
@@ -80,10 +81,25 @@ const MainPage = () => {
 	};
 
 	const handleSoundSelect = (sound: Sound) => {
+		if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+        }
+
 		setSelectedSound(sound);
 		const audio = new Audio(sound.previews['preview-hq-mp3']);
+		audioRef.current = audio;
 		audio.play();
 	};
+
+
+    const handleStopPreview = () => {
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+            setSelectedSound(null);
+        }
+    };
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault();
@@ -106,7 +122,11 @@ const MainPage = () => {
 			console.log('Sending sound to backend:', { pin, sound });
 			socket.current.send(JSON.stringify({ type: 'assign_sound', pin, sound }));
 		}
-		setSelectedSound(null);
+		if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+            setSelectedSound(null);
+        }
 	};
 
 	const handleResetSounds = () => {
@@ -157,6 +177,7 @@ const MainPage = () => {
 						className="search-bar"
 					/>
 				</form>
+
 				<div className="sounds-wrapper">
 					<div className="slider">
 						<label htmlFor="left-slider">Reverb</label>
@@ -170,24 +191,30 @@ const MainPage = () => {
 						/>
 						<span>{leftSliderValue}</span>
 					</div>
-					<div className="sounds">
-						{sounds.map((sound, index) => (
-							<button
-								key={sound.id}
-								className={`sound-button ${
-									selectedSound === sound ? 'selected' : ''
-								}`}
-								onClick={() => handleSoundSelect(sound)}
-							>
-								<img
-									src={sound.images.waveform_m}
-									alt=""
-									height={35}
-									width={35}
-								/>
-								{/* <p>{sound.name}</p> */}
-							</button>
-						))}
+					<div className="preview-menu">
+						<button className="stop-button reset-button" onClick={handleStopPreview}>
+							Stop Preview
+						</button>
+
+						<div className="sounds">
+							{sounds.map((sound, index) => (
+								<button
+									key={sound.id}
+									className={`sound-button ${
+										selectedSound === sound ? 'selected' : ''
+									}`}
+									onClick={() => handleSoundSelect(sound)}
+								>
+									<img
+										src={sound.images.waveform_m}
+										alt=""
+										height={35}
+										width={35}
+									/>
+									{/* <p>{sound.name}</p> */}
+								</button>
+							))}
+						</div>
 					</div>
 					<div className="slider">
 						<label htmlFor="right-slider">Distortion</label>
