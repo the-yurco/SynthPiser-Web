@@ -5,9 +5,10 @@ interface SoundComponentProps {
     index: number;
     onClick: (sound: Sound, index : number) => void;
     onDragStart: (id: number) => void;
+    isSelected: boolean;
 }
 
-const SoundComponent: React.FC<SoundComponentProps> = ({ sound, index, onClick, onDragStart }) => {
+const SoundComponent: React.FC<SoundComponentProps> = ({ sound, index, onClick, onDragStart, isSelected }) => {
 
     const handleClick = () => {
         onClick(sound,index);
@@ -20,7 +21,7 @@ const SoundComponent: React.FC<SoundComponentProps> = ({ sound, index, onClick, 
 
     return (
         <div
-            className="sound-button"
+            className={`sound-button ${isSelected ? 'selected' : ''}`}
             draggable={true}
             onDragStart={handleDragStart}
             onClick = {handleClick}

@@ -227,6 +227,13 @@
 						display: grid;
 						place-items: center;
 					}
+
+					.selected{
+						background-color: rgba(103, 156, 255, 0.4);
+						transform: translateY(-3px);
+						box-shadow: rgba(0, 0, 0, 0.19) 0px 20px 30px,
+							rgba(0, 0, 0, 0.23) 0px 12px 12px;
+					}
 				}
 			}
 		}

@@ -219,7 +219,7 @@ const MainPage = () => {
 
 						<div className="sounds">
 							{sounds.map((sound, index) => (
-                            <SoundComponent key={sound.id} sound={sound} index={index} onClick={handleSoundSelect} onDragStart={() => setSelectedSound(sound)} />
+                            <SoundComponent key={sound.id} sound={sound} index={index} onClick={handleSoundSelect} onDragStart={() => setSelectedSound(sound)} isSelected={selectedSound === sound} />
 							))}
 						</div>
 					</div>
