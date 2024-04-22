@@ -261,12 +261,14 @@ const MainPage = () => {
 				<div className="embedded-keyboard">
 					{assignedSounds.map((sound, index) => (
                         <button
-						key={index}
-						className={`embedded-key ${sound ? 'assigned' : selectedSound ? 'glow empty' : 'empty'}`}
-						onDrop={(e) => handleButtonSoundDrop(index, e)}
-						onDragOver={handleButtonSoundDragOver}
-						onClick={() => handleButtonSoundClick(selectedSound!, index)}
-					>
+							key={index}
+							className={`embedded-key ${sound ? 'assigned' : selectedSound ? 'glow empty' : 'empty'}`}
+							onDrop={(e) => handleButtonSoundDrop(index, e)}
+							onDragOver={handleButtonSoundDragOver}
+							onClick={() =>
+								selectedSound && handleButtonSoundClick(selectedSound, index)
+							}
+						>
 							<div></div>
 						</button>
 					))}
