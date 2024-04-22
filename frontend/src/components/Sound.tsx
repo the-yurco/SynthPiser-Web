@@ -20,7 +20,7 @@ const SoundComponent: React.FC<SoundComponentProps> = ({ sound, index, onClick, 
 
     return (
         <div
-            className="sound"
+            className="sound-button"
             draggable={true}
             onDragStart={handleDragStart}
             onClick = {handleClick}
