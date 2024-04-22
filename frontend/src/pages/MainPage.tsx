@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FaPlay, FaPause, FaRedo } from 'react-icons/fa';
+import SoundComponent from '../components/Sound';
 
-interface Sound {
+export interface Sound {
 	id: number;
 	name: string;
 	bitrate: string;
@@ -129,6 +130,26 @@ const MainPage = () => {
         }
 	};
 
+	const handleButtonSoundDrop = (index: number, e: React.DragEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+        const soundData = e.dataTransfer.getData("sound");
+        const sound = JSON.parse(soundData);
+        const newAssignedSounds = [...assignedSounds];
+        newAssignedSounds[index] = sound;
+        setAssignedSounds(newAssignedSounds);
+
+        // Send the selected sound to the backend
+        if (sound && socket.current) {
+            const pin = buttonPins[index];
+            console.log('Sending sound to backend:', { pin, sound })
+            socket.current.send(JSON.stringify({ type: 'assign_sound', pin, sound }));
+        }
+    };
+
+	const handleButtonSoundDragOver = (e: React.DragEvent<HTMLButtonElement>) => {
+        e.preventDefault();
+    };
+
 	const handleResetSounds = () => {
 		setAssignedSounds(Array(16).fill(null));
 		setSelectedSound(null);
@@ -198,21 +219,7 @@ const MainPage = () => {
 
 						<div className="sounds">
 							{sounds.map((sound, index) => (
-								<button
-									key={sound.id}
-									className={`sound-button ${
-										selectedSound === sound ? 'selected' : ''
-									}`}
-									onClick={() => handleSoundSelect(sound)}
-								>
-									<img
-										src={sound.images.waveform_m}
-										alt=""
-										height={35}
-										width={35}
-									/>
-									{/* <p>{sound.name}</p> */}
-								</button>
+                            <SoundComponent key={sound.id} sound={sound} index={index} onClick={handleSoundSelect} onDragStart={() => setSelectedSound(sound)} />
 							))}
 						</div>
 					</div>
@@ -253,15 +260,13 @@ const MainPage = () => {
 			
 				<div className="embedded-keyboard">
 					{assignedSounds.map((sound, index) => (
-						<button
-							key={index}
-							className={`embedded-key ${
-								sound ? 'assigned' : selectedSound ? ' empty' : 'empty'
-							} `}
-							onClick={() =>
-								selectedSound && handleButtonSoundClick(selectedSound, index)
-							}
-						>
+                        <button
+						key={index}
+						className={`embedded-key ${sound ? 'assigned' : selectedSound ? 'glow empty' : 'empty'}`}
+						onDrop={(e) => handleButtonSoundDrop(index, e)}
+						onDragOver={handleButtonSoundDragOver}
+						onClick={() => handleButtonSoundClick(selectedSound!, index)}
+					>
 							<div></div>
 						</button>
 					))}
