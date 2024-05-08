@@ -5,7 +5,8 @@ import {
 	FaStop,
 	FaRedo,
 	FaCircle,
-	FaSquare
+	FaSquare,
+	FaReply
 } from 'react-icons/fa';
 
 type BeatControlsProps = {
@@ -20,9 +21,9 @@ const BeatControls = ({ socket }: BeatControlsProps) => {
 	const [axisPosition, setAxisPosition] = useState<number>(0);
 
 	const timerRef = useRef<number | null>(null);
+	const replayRef = useRef<boolean>(false);
 
-	// test
-	const buttonPins = [3, 7, 11];
+	const buttonPins = [3, 7, 11]; // Example button pins for demonstration
 
 	const togglePlayPause = () => {
 		setIsPlaying(!isPlaying);
@@ -36,9 +37,9 @@ const BeatControls = ({ socket }: BeatControlsProps) => {
 						window.clearInterval(timerRef.current!);
 						return 0;
 					}
-					return prevValue + 10;
+					return prevValue + 10; // Increase by 10 milliseconds
 				});
-			}, 10);
+			}, 10); // Update every 10 milliseconds
 		} else {
 			setTimerRunning(false);
 			window.clearInterval(timerRef.current!);
@@ -69,6 +70,15 @@ const BeatControls = ({ socket }: BeatControlsProps) => {
 		setRecordedButtons([]);
 	};
 
+	const handleReplay = () => {
+		if (recordedButtons.length > 0) {
+			setIsPlaying(true);
+			setTimerValue(0);
+			setAxisPosition(0);
+			replayRef.current = true;
+		}
+	};
+
 	useEffect(() => {
 		if (socket) {
 			socket.onmessage = (event) => {
@@ -86,11 +96,17 @@ const BeatControls = ({ socket }: BeatControlsProps) => {
 			const interval = setInterval(() => {
 				if (index < recordedButtons.length) {
 					setTimerValue(recordedButtons[index]);
-					setAxisPosition((recordedButtons[index] / 10000) * 100);
+					setAxisPosition((recordedButtons[index] / 10000) * 100); // Update axis position
 					index++;
 				} else {
 					clearInterval(interval);
 					setIsPlaying(false);
+					if (replayRef.current) {
+						replayRef.current = false;
+						setTimeout(() => {
+							togglePlayPause();
+						}, 500);
+					}
 				}
 			}, 10);
 			return () => clearInterval(interval);
@@ -134,11 +150,14 @@ const BeatControls = ({ socket }: BeatControlsProps) => {
 				<button onClick={handleClearRecordedButtons}>
 					<FaSquare /> Clear Recorded
 				</button>
+				<button onClick={handleReplay}>
+					<FaReply /> Replay
+				</button>
 			</div>
 			<div className="static-buttons">
 				{buttonPins.map((pin, index) => (
 					<button key={index} onClick={() => handleButtonPress(pin)}>
-						Test Button {index + 1}
+						<FaCircle /> Test Button {index + 1}
 					</button>
 				))}
 			</div>
