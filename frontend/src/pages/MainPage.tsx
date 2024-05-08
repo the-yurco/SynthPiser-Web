@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaPlay, FaPause, FaRedo } from 'react-icons/fa';
 import SoundComponent from '../components/Sound';
+import BeatControls from '../components/BeatControls';
 
 export interface Sound {
 	id: number;
@@ -25,10 +25,6 @@ const MainPage = () => {
 	);
 	const [leftSliderValue, setLeftSliderValue] = useState<number>(0);
 	const [rightSliderValue, setRightSliderValue] = useState<number>(0);
-	const [timerRunning, setTimerRunning] = useState<boolean>(false);
-	const [timerValue, setTimerValue] = useState<number>(0);
-	const [isPlaying, setIsPlaying] = useState<boolean>(false);
-	const timerRef = useRef<number | null>(null);
 
 	const socket = useRef<WebSocket | null>(null);
 	const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -83,9 +79,9 @@ const MainPage = () => {
 
 	const handleSoundSelect = (sound: Sound) => {
 		if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-        }
+			audioRef.current.pause();
+			audioRef.current.currentTime = 0;
+		}
 
 		setSelectedSound(sound);
 		const audio = new Audio(sound.previews['preview-hq-mp3']);
@@ -93,14 +89,13 @@ const MainPage = () => {
 		audio.play();
 	};
 
-
-    const handleStopPreview = () => {
-        if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-            setSelectedSound(null);
-        }
-    };
+	const handleStopPreview = () => {
+		if (audioRef.current) {
+			audioRef.current.pause();
+			audioRef.current.currentTime = 0;
+			setSelectedSound(null);
+		}
+	};
 
 	const handleSearch = (e: React.FormEvent) => {
 		e.preventDefault();
@@ -108,7 +103,7 @@ const MainPage = () => {
 	};
 
 	const buttonPins = [
-		5, 6, 13, 19, 26, 16, 20, 21, 4 , 17, 27, 22 ,24 ,25 ,23, 18
+		5, 6, 13, 19, 26, 16, 20, 21, 4, 17, 27, 22, 24, 25, 23, 18
 	];
 
 	const handleButtonSoundClick = (sound: Sound, index: number) => {
@@ -124,64 +119,34 @@ const MainPage = () => {
 			socket.current.send(JSON.stringify({ type: 'assign_sound', pin, sound }));
 		}
 		if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-            setSelectedSound(null);
-        }
-	};
-
-	const handleButtonSoundDrop = (index: number, e: React.DragEvent<HTMLButtonElement>) => {
-        e.preventDefault();
-        const soundData = e.dataTransfer.getData("sound");
-        const sound = JSON.parse(soundData);
-        const newAssignedSounds = [...assignedSounds];
-        newAssignedSounds[index] = sound;
-        setAssignedSounds(newAssignedSounds);
-
-        // Send the selected sound to the backend
-        if (sound && socket.current) {
-            const pin = buttonPins[index];
-            console.log('Sending sound to backend:', { pin, sound })
-            socket.current.send(JSON.stringify({ type: 'assign_sound', pin, sound }));
-        }
-    };
-
-	const handleButtonSoundDragOver = (e: React.DragEvent<HTMLButtonElement>) => {
-        e.preventDefault();
-    };
-
-	const handleResetSounds = () => {
-		setAssignedSounds(Array(16).fill(null));
-		setSelectedSound(null);
-	};
-
-	const togglePlayPause = () => {
-		setIsPlaying(!isPlaying);
-		if (!timerRunning) {
-			setTimerValue(0);
-			setTimerRunning(true);
-			timerRef.current = window.setInterval(() => {
-				setTimerValue((prevValue) => {
-					if (prevValue >= 10) {
-						setTimerRunning(false);
-						window.clearInterval(timerRef.current!);
-						return 0;
-					}
-					return prevValue + 1;
-				});
-			}, 1000);
-		} else {
-			setTimerRunning(false);
-			window.clearInterval(timerRef.current!);
+			audioRef.current.pause();
+			audioRef.current.currentTime = 0;
+			setSelectedSound(null);
 		}
 	};
 
-	const resetAudio = () => {
-		setSelectedSound(null);
+	const handleButtonSoundDrop = (
+		index: number,
+		e: React.DragEvent<HTMLButtonElement>
+	) => {
+		e.preventDefault();
+		const soundData = e.dataTransfer.getData('sound');
+		const sound = JSON.parse(soundData);
+		const newAssignedSounds = [...assignedSounds];
+		newAssignedSounds[index] = sound;
+		setAssignedSounds(newAssignedSounds);
+
+		// Send the selected sound to the backend
+		if (sound && socket.current) {
+			const pin = buttonPins[index];
+			console.log('Sending sound to backend:', { pin, sound });
+			socket.current.send(JSON.stringify({ type: 'assign_sound', pin, sound }));
+		}
 	};
 
-	const playPauseButton =
-		timerValue > 10 ? <FaPlay /> : isPlaying ? <FaPause /> : <FaPlay />;
+	const handleButtonSoundDragOver = (e: React.DragEvent<HTMLButtonElement>) => {
+		e.preventDefault();
+	};
 
 	return (
 		<div className="main-page">
@@ -213,13 +178,23 @@ const MainPage = () => {
 						<span>{leftSliderValue}</span>
 					</div>
 					<div className="preview-menu">
-						<button className="stop-button reset-button" onClick={handleStopPreview}>
+						<button
+							className="stop-button reset-button"
+							onClick={handleStopPreview}
+						>
 							Stop Preview
 						</button>
 
 						<div className="sounds">
 							{sounds.map((sound, index) => (
-                            <SoundComponent key={sound.id} sound={sound} index={index} onClick={handleSoundSelect} onDragStart={() => setSelectedSound(sound)} isSelected={selectedSound === sound} />
+								<SoundComponent
+									key={sound.id}
+									sound={sound}
+									index={index}
+									onClick={handleSoundSelect}
+									onDragStart={() => setSelectedSound(sound)}
+									isSelected={selectedSound === sound}
+								/>
 							))}
 						</div>
 					</div>
@@ -237,32 +212,15 @@ const MainPage = () => {
 					</div>
 				</div>
 
-				<div className="beat-controls">
-					<div className="visualizer">
-						<div className="timer-wrapper">
-							<div className="timer">{timerValue}</div>
-						</div>
-						<div
-							className="timer-line"
-							style={{ width: `${timerValue * 10}%` }}
-						/>
-					</div>
-					<div className="beat-buttons">
-						<button onClick={togglePlayPause}>{playPauseButton}</button>
-						<button onClick={resetAudio}>
-							<FaRedo />
-						</button>
-							<button className="reset-button" onClick={handleResetSounds}>
-						Reset
-					</button>
-					</div>
-				</div>
-			
+				<BeatControls socket={socket.current} />
+
 				<div className="embedded-keyboard">
 					{assignedSounds.map((sound, index) => (
-                        <button
+						<button
 							key={index}
-							className={`embedded-key ${sound ? 'assigned' : selectedSound ? 'glow empty' : 'empty'}`}
+							className={`embedded-key ${
+								sound ? 'assigned' : selectedSound ? 'glow empty' : 'empty'
+							}`}
 							onDrop={(e) => handleButtonSoundDrop(index, e)}
 							onDragOver={handleButtonSoundDragOver}
 							onClick={() =>
