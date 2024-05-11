@@ -1,74 +1,154 @@
-import pygame
 import asyncio
-import websockets
 import json
-import random
+import os
+import pygame
 import requests
 import RPi.GPIO as GPIO
-from pydub import AudioSegment
-from pydub.playback import play
-import io
+import websockets
+import smbus
+import time
+import busio
+import board
+
+i2c = busio.I2C(board.SCL, board.SDA)
+
+bus = smbus.SMBus(1)  # Use bus number 1 (the number might be different based on your system configuration)
+
+# Address of the ADC (AOS1015)
+DEVICE_ADDRESS = 0x48  # Replace with the actual address if different
+
+# Read analog values from potentiometer 1 (connected to A0)
+value_potentiometer_1 = bus.read_byte_data(DEVICE_ADDRESS, 0)
+
+# Read analog values from potentiometer 2 (connected to A1)
+value_potentiometer_2 = bus.read_byte_data(DEVICE_ADDRESS, 1)
+
+print("Value from potentiometer 1:", value_potentiometer_1)
+print("Value from potentiometer 2:", value_potentiometer_2)
 
 pygame.mixer.init()
 
-button_pins = [4, 17, 27, 22, 18, 23, 24, 25, 5, 6, 13, 19, 26, 16, 20, 21]
+button_pins = [5, 6, 13, 19, 26, 16, 20, 21, 4, 17, 27, 22, 24, 25, 23, 18]
 assigned_sounds = {pin: None for pin in button_pins}
+sound_files = {}
+playing_sounds = {}
+button_pressed = {pin: False for pin in button_pins}
 connected_clients = set()
 
+# Define the address of the I2C device
+DEVICE_ADDRESS = 0x48  # Replace with the actual address of your device
+
+# Create an smbus object
+bus = smbus.SMBus(1)  # 1 indicates the I2C bus number
+
 async def handle_message(websocket, path):
-    global assigned_sounds, connected_clients
+    global connected_clients
     connected_clients.add(websocket)
     try:
+        print("Client connected:", websocket.remote_address)
         async for message in websocket:
+            print("Received message:", message)
             data = json.loads(message)
             if data['type'] == 'assign_sound':
                 pin = data['pin']
                 sound = data['sound']
-                assigned_sounds[pin] = sound
-                await broadcast_assigned_sounds()
+                if assigned_sounds[pin] != sound:
+                    assigned_sounds[pin] = sound
+                    await download_sound(pin, sound)
+                    await broadcast_assigned_sounds()
     except websockets.exceptions.ConnectionClosedError:
+        print("Client disconnected:", websocket.remote_address)
         pass
     finally:
         connected_clients.remove(websocket)
 
 async def broadcast_assigned_sounds():
-    global assigned_sounds, connected_clients
-    # Broadcast assigned sounds to all connected clients
+    global connected_clients
     await asyncio.gather(
         *[ws.send(json.dumps({'type': 'assigned_sounds', 'sounds': assigned_sounds})) for ws in connected_clients]
     )
 
-async def button_click(pin):
-    print(f"Button on pin {pin} clicked")  # Print button pin number when clicked
-    # Optionally, you can perform additional actions here
-    if assigned_sounds[pin]:
-        await play_sound(pin, assigned_sounds[pin])
-
-async def play_sound(pin, sound):
+async def download_sound(pin, sound):
+    global sound_files
     sound_url = sound['previews']['preview-hq-mp3']
+    sound_file_path = f"sound_{pin}.mp3"
+
+    if os.path.exists(sound_file_path):
+        os.remove(sound_file_path)
+
     response = requests.get(sound_url)
     if response.status_code == 200:
-        audio_data = AudioSegment.from_mp3(io.BytesIO(response.content))
-        play(audio_data)
+        with open(sound_file_path, 'wb') as f:
+            f.write(response.content)
+        
+        sound_files[pin] = sound_file_path
     else:
         print(f"Failed to retrieve sound file from {sound_url}. Status code: {response.status_code}")
 
+async def button_click(pin):
+    global button_pressed
+    if button_pressed[pin]:
+        return
+    button_pressed[pin] = True
+    print(f"Button on pin {pin} clicked")
+    if pin in playing_sounds:
+        playing_sounds[pin].stop()
+        del playing_sounds[pin]
+    await play_sound(pin)
+    if sound_files.get(pin):  # Check if there's a sound assigned to this button
+        await broadcast_button_click(pin)
+
+async def play_sound(pin):
+    global sound_files, playing_sounds
+    sound_file_path = sound_files.get(pin)
+    if sound_file_path:
+        sound = pygame.mixer.Sound(sound_file_path)
+        sound.play()
+        playing_sounds[pin] = sound
+
+async def button_release(pin):
+    global button_pressed
+    button_pressed[pin] = False
+
 async def detect_button_clicks():
-    # Set up GPIO pins
     GPIO.setmode(GPIO.BCM)
     for pin in button_pins:
         GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     
     while True:
-        # Detect button clicks
         for pin in button_pins:
             if GPIO.input(pin) == GPIO.LOW:
                 await button_click(pin)
-                # Play sound immediately after button press
-        await asyncio.sleep(0.01)  # Reduced sleep time for faster response
+                while GPIO.input(pin) == GPIO.LOW:
+                    await asyncio.sleep(0.01)
+                await button_release(pin)
+        
+        # Read the values from the potentiometers
+        value_potentiometer_1 = bus.read_byte_data(DEVICE_ADDRESS, 0)
+        value_potentiometer_2 = bus.read_byte_data(DEVICE_ADDRESS, 1)
+        
+        print("Potentiometer 1 value:", value_potentiometer_1)
+        print("Potentiometer 2 value:", value_potentiometer_2)
+        
+        await asyncio.sleep(0.5)  # Sleep for a short duration
 
-start_server = websockets.serve(handle_message, "0.0.0.0", 8765)
+async def main():
+    await asyncio.gather(
+        websockets.serve(handle_message, "0.0.0.0", 8765),
+        detect_button_clicks()
+    )
 
-asyncio.get_event_loop().run_until_complete(start_server)
-asyncio.get_event_loop().run_until_complete(detect_button_clicks())  # Run the button click detection
-asyncio.get_event_loop().run_forever()
+async def broadcast_button_click(pin):
+    global connected_clients
+    
+    await asyncio.gather(
+        *[ws.send(json.dumps({'type': 'button_click', 'pin': pin})) for ws in connected_clients]
+    )
+
+async def preload_sound_files():
+    for pin, sound in assigned_sounds.items():
+        if sound:
+            await download_sound(pin, sound)
+
+asyncio.run(preload_sound_files())
+asyncio.run(main())
