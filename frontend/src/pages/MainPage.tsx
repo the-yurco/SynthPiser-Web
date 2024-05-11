@@ -32,19 +32,16 @@ const MainPage = () => {
 	useEffect(() => {
 		// Initialize the WebSocket connection
 		socket.current = new WebSocket('ws://192.168.0.201:8765');
-
+	
 		socket.current.onopen = () => {
 			console.log('WebSocket connection established.');
 		};
-
-		socket.current.onmessage = (event: any) => {
-			console.log('Received message:', event.data);
-		};
-
+	
+	
 		socket.current.onclose = () => {
 			console.log('WebSocket connection closed.');
 		};
-
+	
 		// Clean up WebSocket connection when component unmounts
 		return () => {
 			if (socket.current) {

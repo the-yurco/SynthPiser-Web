@@ -23,8 +23,6 @@ const BeatControls = ({ socket }: BeatControlsProps) => {
 	const timerRef = useRef<number | null>(null);
 	const replayRef = useRef<boolean>(false);
 
-	const buttonPins = [3, 7, 11]; // Example button pins for demonstration
-
 	const togglePlayPause = () => {
 		setIsPlaying(!isPlaying);
 		if (!timerRunning) {
@@ -82,8 +80,9 @@ const BeatControls = ({ socket }: BeatControlsProps) => {
 	useEffect(() => {
 		if (socket) {
 			socket.onmessage = (event) => {
+				console.log('Received message:', event.data);
 				const data = JSON.parse(event.data);
-				if (data.type === 'assign_sound' && data.pin) {
+				if (data.type === 'button_click' && data.pin) {
 					setRecordedButtons((prevButtons) => [...prevButtons, timerValue]);
 				}
 			};
@@ -153,13 +152,6 @@ const BeatControls = ({ socket }: BeatControlsProps) => {
 				<button onClick={handleReplay}>
 					<FaReply /> Replay
 				</button>
-			</div>
-			<div className="static-buttons">
-				{buttonPins.map((pin, index) => (
-					<button key={index} onClick={() => handleButtonPress(pin)}>
-						<FaCircle /> Test Button {index + 1}
-					</button>
-				))}
 			</div>
 		</div>
 	);
