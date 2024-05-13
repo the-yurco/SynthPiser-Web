@@ -1,46 +1,68 @@
-# Getting Started with Create React App
+# Synthpizer / MPC Project
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Overview
 
-## Available Scripts
+This project combines both a web application and embedded systems to create a Synthpizer (Synthesizer + Sampler) or MPC (Music Production Center) system. The web application is built with React.js, while the embedded system is programmed with Python to run on a Raspberry Pi. The project allows users to interact with the Synthpizer/MPC through the web interface, selecting sounds and controlling playback, while the embedded system handles the actual playback of sounds and interaction with physical buttons.
 
-In the project directory, you can run:
+### Web Application (React.js)
 
-### `npm start`
+The web application provides a user-friendly interface for interacting with the Synthpizer/MPC. Users can:
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+- Browse and select sounds from a list fetched from an API (FreeSound API).
+- Assign selected sounds to physical buttons on the embedded system.
+- Control playback of assigned sounds, including play, pause, stop, and reset functions.
+- Monitor playback status and adjust settings such as reverb and distortion.
+- Search for specific sounds using a search bar.
+- View visual representations of selected sounds.
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+### Embedded System (Python on Raspberry Pi)
 
-### `npm test`
+The embedded system serves as the backend for the Synthpizer/MPC, handling sound playback and physical button interaction. It:
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- Utilizes a Raspberry Pi for hardware control and sound playback.
+- Interfaces with physical buttons to trigger sound playback events.
+- Communicates with the web application via WebSocket to receive sound assignments and button click events.
+- Preloads sound files from the web application for quick playback.
+- Controls audio playback using the Pygame library.
+- Detects button clicks and sends events to the web application for visual feedback.
 
-### `npm run build`
+## Features
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- **Web Application**:
+  - Fetch sounds from the FreeSound API for selection.
+  - Assign selected sounds to physical buttons.
+  - Control playback of assigned sounds.
+  - Visual feedback for sound selection and playback.
+- **Embedded System**:
+  - Interface with physical buttons for triggering sounds.
+  - Preload sound files for quick playback.
+  - Handle sound playback using Pygame.
+  - Communicate with the web application via WebSocket.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Technologies Used
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- **Web Application**:
+  - React.js: Frontend framework for building user interfaces.
+  - WebSocket: For real-time communication with the embedded system.
+  - Axios: HTTP client for fetching sound data from the FreeSound API.
+- **Embedded System**:
+  - Raspberry Pi: Hardware platform for embedded system development.
+  - Python: Programming language used for backend development.
+  - Pygame: Library for audio playback and control.
 
-### `npm run eject`
+## Usage
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+1. Clone the repository.
+2. Install dependencies for the web application using `npm install`.
+3. Run the web application using `npm start`.
+4. Ensure the Raspberry Pi is set up and connected to the same network.
+5. Run the Python script on the Raspberry Pi to start the embedded system.
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Acknowledgments
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+- Special thanks to the creators of the FreeSound API for providing access to a wide range of sounds.
+- Thanks to the Raspberry Pi community for their resources and support in embedded system development.
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+## Authors
 
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
+- Yurco & Rondon
