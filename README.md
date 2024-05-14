@@ -1,4 +1,4 @@
-# Synthpizer / MPC Project
+# Synthpiser / MPC Project
 
 ## Overview
 
