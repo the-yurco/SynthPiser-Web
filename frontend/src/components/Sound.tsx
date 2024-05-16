@@ -26,7 +26,7 @@ const SoundComponent: React.FC<SoundComponentProps> = ({ sound, index, onClick, 
             onDragStart={handleDragStart}
             onClick = {handleClick}
         >
-            <img src={sound.images.waveform_m} alt="" height={75} width={75} />
+            <img src={sound.images.waveform_m} alt="" height={100} width={100} />
         </div>
     );
 };

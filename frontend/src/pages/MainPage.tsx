@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SoundComponent from '../components/Sound';
 import BeatControls from '../components/BeatControls';
+import PresetsDropdown from '../components/PresetsDropdown';
 
 export interface Sound {
 	id: number;
@@ -99,6 +100,19 @@ const MainPage = () => {
 		fetchSounds(query);
 	};
 
+	const handlePresetSelect = (presetSounds: Sound[]) => {
+		setAssignedSounds(presetSounds);
+		console.log('Sending preset to backend:', presetSounds);
+		presetSounds.forEach((sound, index) => {
+		  const pin = buttonPins[index];
+		  console.log('Sending sound to backend:', { pin, sound });
+		  if (socket.current) {
+			socket.current.send(JSON.stringify({ type: 'assign_sound', pin, sound }));
+		  }
+		});
+	  };
+		
+
 	const buttonPins = [
 		5, 6, 13, 19, 26, 16, 20, 21, 4, 17, 27, 22, 24, 25, 23, 18
 	];
@@ -183,16 +197,26 @@ const MainPage = () => {
 						</button>
 
 						<div className="sounds">
-							{sounds.map((sound, index) => (
-								<SoundComponent
-									key={sound.id}
-									sound={sound}
-									index={index}
-									onClick={handleSoundSelect}
-									onDragStart={() => setSelectedSound(sound)}
-									isSelected={selectedSound === sound}
+							<div className="presets">
+								<PresetsDropdown 
+									handlePresetSelect={handlePresetSelect}
+									socket={socket.current}
+									buttonPins={buttonPins}
+									assignedSounds={assignedSounds}
 								/>
-							))}
+							</div>
+							<div className="sounds-grid">
+								{sounds.map((sound, index) => (
+									<SoundComponent
+										key={sound.id}
+										sound={sound}
+										index={index}
+										onClick={handleSoundSelect}
+										onDragStart={() => setSelectedSound(sound)}
+										isSelected={selectedSound === sound}
+									/>
+								))}
+							</div>
 						</div>
 					</div>
 					<div className="slider">
