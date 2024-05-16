@@ -115,14 +115,9 @@ async def detect_button_clicks():
     for pin in button_pins:
         GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     
+    prev_button_state = {pin: True for pin in button_pins}
+    
     while True:
-        for pin in button_pins:
-            if GPIO.input(pin) == GPIO.LOW:
-                await button_click(pin)
-                while GPIO.input(pin) == GPIO.LOW:
-                    await asyncio.sleep(0.01)
-                await button_release(pin)
-        
         # Read the values from the potentiometers
         value_potentiometer_1 = bus.read_byte_data(DEVICE_ADDRESS, 0)
         value_potentiometer_2 = bus.read_byte_data(DEVICE_ADDRESS, 1)
@@ -130,7 +125,17 @@ async def detect_button_clicks():
         print("Potentiometer 1 value:", value_potentiometer_1)
         print("Potentiometer 2 value:", value_potentiometer_2)
         
-        await asyncio.sleep(0.5)  # Sleep for a short duration
+        # Check button presses
+        for pin in button_pins:
+            button_state = GPIO.input(pin) == GPIO.LOW
+            if button_state and not prev_button_state[pin]:
+                await button_click(pin)
+            elif not button_state and prev_button_state[pin]:
+                await button_release(pin)
+            prev_button_state[pin] = button_state
+        
+        await asyncio.sleep(0.01)  # Short sleep to prevent busy loop
+
 
 async def main():
     await asyncio.gather(
