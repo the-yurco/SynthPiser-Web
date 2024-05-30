@@ -5,26 +5,7 @@ import pygame
 import requests
 import RPi.GPIO as GPIO
 import websockets
-import smbus
-import time
-import busio
-import board
-
-i2c = busio.I2C(board.SCL, board.SDA)
-
-bus = smbus.SMBus(1)  # Use bus number 1 (the number might be different based on your system configuration)
-
-# Address of the ADC (AOS1015)
-DEVICE_ADDRESS = 0x48  # Replace with the actual address if different
-
-# Read analog values from potentiometer 1 (connected to A0)
-value_potentiometer_1 = bus.read_byte_data(DEVICE_ADDRESS, 0)
-
-# Read analog values from potentiometer 2 (connected to A1)
-value_potentiometer_2 = bus.read_byte_data(DEVICE_ADDRESS, 1)
-
-print("Value from potentiometer 1:", value_potentiometer_1)
-print("Value from potentiometer 2:", value_potentiometer_2)
+from Adafruit_ADS1x15 import ADS1115
 
 pygame.mixer.init()
 
@@ -35,15 +16,19 @@ playing_sounds = {}
 button_pressed = {pin: False for pin in button_pins}
 connected_clients = set()
 
-# Define the address of the I2C device
-DEVICE_ADDRESS = 0x48  # Replace with the actual address of your device
-
-# Create an smbus object
-bus = smbus.SMBus(1)  # 1 indicates the I2C bus number
+# Set I2C bus number
+I2C_BUS_NUM = 1
+# Create an ADS1115 ADC object at address 0x48
+adc = ADS1115(address=0x48, busnum=I2C_BUS_NUM)
+# Set the gain to ±4.096V (adjust if needed)
+GAIN = 1
 
 async def handle_message(websocket, path):
-    global connected_clients
+    global connected_clients, sound_files, playing_sounds
     connected_clients.add(websocket)
+    sound_files = {}  # Reset sound_files dictionary when a new client connects
+    playing_sounds = {}  # Reset playing_sounds dictionary when a new client connects
+    assigned_sounds = {pin: None for pin in button_pins}  # Reset assigned sounds when a new client connects
     try:
         print("Client connected:", websocket.remote_address)
         async for message in websocket:
@@ -100,11 +85,35 @@ async def button_click(pin):
 
 async def play_sound(pin):
     global sound_files, playing_sounds
+    
     sound_file_path = sound_files.get(pin)
     if sound_file_path:
         sound = pygame.mixer.Sound(sound_file_path)
+        
+        # Apply distortion effect based on the potentiometer value
+        raw_distortion_value = adc.read_adc(2, gain=GAIN)
+        percent_distortion_value = round((raw_distortion_value / 26362) * 100)
+        distortion_level = percent_distortion_value - 50  # Center at 50
+        
+        sound.set_volume(1.0)  # Reset volume
+        
+        # Apply distortion effect
+        sound.set_volume(max(0, min(1.0, 1.0 + (distortion_level / 100.0))))
+        
+        # Apply reverb effect based on the potentiometer value
+        raw_reverb_value = adc.read_adc(3, gain=GAIN)
+        percent_reverb_value = round((raw_reverb_value / 26362) * 100)
+        reverb_level = percent_reverb_value - 50  # Center at 50
+        
+        # Apply reverb effect
+        sound.set_volume(max(0, min(1.0, 1.0 + (reverb_level / 100.0))))
+        
+        # Play the sound
         sound.play()
+        
         playing_sounds[pin] = sound
+
+
 
 async def button_release(pin):
     global button_pressed
@@ -115,32 +124,64 @@ async def detect_button_clicks():
     for pin in button_pins:
         GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     
-    prev_button_state = {pin: True for pin in button_pins}
+    while True:
+        for pin in button_pins:
+            if GPIO.input(pin) == GPIO.LOW:
+                await button_click(pin)
+                while GPIO.input(pin) == GPIO.LOW:
+                    await asyncio.sleep(0.01)
+                await button_release(pin)
+        await asyncio.sleep(0.01)
+
+async def read_potentiometer():
+    # Initialize previous values for distortion and reverb
+    prev_distortion_value = None
+    prev_reverb_value = None
     
     while True:
-        # Read the values from the potentiometers
-        value_potentiometer_1 = bus.read_byte_data(DEVICE_ADDRESS, 0)
-        value_potentiometer_2 = bus.read_byte_data(DEVICE_ADDRESS, 1)
+        # Read the raw analog value from channel A2 for distortion
+        raw_distortion_value = adc.read_adc(2, gain=GAIN)
+        # Scale the raw value to a percentage (0-100)
+        percent_distortion_value = round((raw_distortion_value / 26362) * 100)
         
-        print("Potentiometer 1 value:", value_potentiometer_1)
-        print("Potentiometer 2 value:", value_potentiometer_2)
+        # Read the raw analog value from channel A3 for reverb
+        raw_reverb_value = adc.read_adc(3, gain=GAIN)
+        # Scale the raw value to a percentage (0-100)
+        percent_reverb_value = round((raw_reverb_value / 26362) * 100)
         
-        # Check button presses
-        for pin in button_pins:
-            button_state = GPIO.input(pin) == GPIO.LOW
-            if button_state and not prev_button_state[pin]:
-                await button_click(pin)
-            elif not button_state and prev_button_state[pin]:
-                await button_release(pin)
-            prev_button_state[pin] = button_state
+        # Check if distortion value changed by 5% or more
+        if prev_distortion_value is None or abs(percent_distortion_value - prev_distortion_value) >= 5:
+            # Broadcast the distortion value to all connected clients
+            await broadcast_potentiometer_value('distortion', percent_distortion_value)
+            # Update previous distortion value
+            prev_distortion_value = percent_distortion_value
         
-        await asyncio.sleep(0.01)  # Short sleep to prevent busy loop
+        # Check if reverb value changed by 5% or more
+        if prev_reverb_value is None or abs(percent_reverb_value - prev_reverb_value) >= 5:
+            # Broadcast the reverb value to all connected clients
+            await broadcast_potentiometer_value('reverb', percent_reverb_value)
+            # Update previous reverb value
+            prev_reverb_value = percent_reverb_value
+        
+        # Delay for a short interval before reading again
+        await asyncio.sleep(1)
 
+async def broadcast_potentiometer_value(potentiometer_type, value):
+    global connected_clients
+    message = json.dumps({
+        'type': 'potentiometer_value',
+        'potentiometer_type': potentiometer_type,
+        'value': value
+    })
+    await asyncio.gather(
+        *[ws.send(message) for ws in connected_clients]
+    )
 
 async def main():
     await asyncio.gather(
         websockets.serve(handle_message, "0.0.0.0", 8765),
-        detect_button_clicks()
+        detect_button_clicks(),
+        read_potentiometer()
     )
 
 async def broadcast_button_click(pin):

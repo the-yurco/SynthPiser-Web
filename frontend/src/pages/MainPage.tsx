@@ -181,8 +181,8 @@ const MainPage = () => {
 						<input
 							type="range"
 							id="left-slider"
-							min="-20"
-							max="20"
+							min="50"
+							max="-50"
 							value={leftSliderValue}
 							onChange={(e) => setLeftSliderValue(parseInt(e.target.value))}
 						/>
@@ -224,8 +224,8 @@ const MainPage = () => {
 						<input
 							type="range"
 							id="right-slider"
-							min="-20"
-							max="20"
+							min="50"
+							max="-50"
 							value={rightSliderValue}
 							onChange={(e) => setRightSliderValue(parseInt(e.target.value))}
 						/>
