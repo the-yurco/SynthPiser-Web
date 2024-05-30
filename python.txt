@@ -2,6 +2,8 @@ import asyncio
 import json
 import os
 import pygame
+import numpy as np
+import pygame.mixer
 import requests
 import RPi.GPIO as GPIO
 import websockets
@@ -84,34 +86,46 @@ async def button_click(pin):
         await broadcast_button_click(pin)
 
 async def play_sound(pin):
-    global sound_files, playing_sounds
-    
+    global sound_files, playing_sounds, adc
+
     sound_file_path = sound_files.get(pin)
     if sound_file_path:
-        sound = pygame.mixer.Sound(sound_file_path)
-        
-        # Apply distortion effect based on the potentiometer value
+        # Read the raw analog value from the distortion potentiometer channel (A2)
         raw_distortion_value = adc.read_adc(2, gain=GAIN)
         percent_distortion_value = round((raw_distortion_value / 26362) * 100)
+        
+        # Calculate distortion level based on the potentiometer value
         distortion_level = percent_distortion_value - 50  # Center at 50
         
-        sound.set_volume(1.0)  # Reset volume
-        
-        # Apply distortion effect
-        sound.set_volume(max(0, min(1.0, 1.0 + (distortion_level / 100.0))))
-        
-        # Apply reverb effect based on the potentiometer value
+        # Read the raw analog value from the reverb potentiometer channel (A3)
         raw_reverb_value = adc.read_adc(3, gain=GAIN)
         percent_reverb_value = round((raw_reverb_value / 26362) * 100)
+        
+        # Calculate reverb level based on the potentiometer value
         reverb_level = percent_reverb_value - 50  # Center at 50
         
-        # Apply reverb effect
-        sound.set_volume(max(0, min(1.0, 1.0 + (reverb_level / 100.0))))
+        sound = pygame.mixer.Sound(sound_file_path)
+        sound_array = pygame.sndarray.array(sound)
         
-        # Play the sound
-        sound.play()
+        # Apply distortion effect using clipping
+        distorted_array = np.clip(sound_array * (1 + distortion_level / 100.0), -1, 1)
         
-        playing_sounds[pin] = sound
+        # Apply reverb effect using simple delay
+        reverb_delay = int(44100 * reverb_level / 100.0)  # Convert reverb level to number of samples
+        reverb_array = np.zeros_like(sound_array, dtype=np.float64)  # Ensure float64 dtype
+        reverb_array[reverb_delay:] = distorted_array[:-reverb_delay]
+        reverb_array += distorted_array.astype(np.float64) * 0.3  # Mix original and delayed signal
+
+        # Convert back to int16 for pygame sound
+        reverb_array = np.clip(reverb_array, -1, 1)
+        reverb_array_int16 = (reverb_array * 32767).astype(np.int16)  # Scale to int16 range
+        reverb_sound = pygame.sndarray.make_sound(reverb_array_int16)
+
+        
+        # Play the sound with distortion and reverb
+        reverb_sound.play()
+        
+        playing_sounds[pin] = reverb_sound
 
 
 
