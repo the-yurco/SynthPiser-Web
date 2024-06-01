@@ -2,14 +2,15 @@ import asyncio
 import json
 import os
 import pygame
-import numpy as np
-import pygame.mixer
 import requests
 import RPi.GPIO as GPIO
 import websockets
 from Adafruit_ADS1x15 import ADS1115
+import numpy as np
+from pysndfx import AudioEffectsChain
 
-pygame.mixer.init()
+# Initialize Pygame mixer
+pygame.mixer.init(frequency=44100, size=-16, channels=2)
 
 button_pins = [5, 6, 13, 19, 26, 16, 20, 21, 4, 17, 27, 22, 24, 25, 23, 18]
 assigned_sounds = {pin: None for pin in button_pins}
@@ -22,11 +23,11 @@ connected_clients = set()
 I2C_BUS_NUM = 1
 # Create an ADS1115 ADC object at address 0x48
 adc = ADS1115(address=0x48, busnum=I2C_BUS_NUM)
-# Set the gain to ±4.096V (adjust if needed)
+# Set the gain to Â±4.096V (adjust if needed)
 GAIN = 1
 
 async def handle_message(websocket, path):
-    global connected_clients, sound_files, playing_sounds
+    global connected_clients, sound_files, playing_sounds, assigned_sounds
     connected_clients.add(websocket)
     sound_files = {}  # Reset sound_files dictionary when a new client connects
     playing_sounds = {}  # Reset playing_sounds dictionary when a new client connects
@@ -84,6 +85,29 @@ async def button_click(pin):
     await play_sound(pin)
     if sound_files.get(pin):  # Check if there's a sound assigned to this button
         await broadcast_button_click(pin)
+        
+def adjust_reverb_level(percent_reverb_value):
+    # Apply a nonlinear scaling function to compress the range of lower values more aggressively
+    scaled_reverb_level = (percent_reverb_value / 100.0) ** 2  # Example nonlinear scaling function
+    return scaled_reverb_level
+        
+async def apply_reverb(sound_array, reverb_level):
+    # Apply a spatial reverb effect
+    # You can adjust the reverb level and decay time for different effects
+    decay = 0.5  # Adjust the decay time of the reverb effect
+    reverb_samples = int(44100 * decay)
+    reverb = np.zeros_like(sound_array)
+
+    for i in range(reverb_samples, len(sound_array)):
+        reverb[i] = sound_array[i - reverb_samples] * reverb_level
+
+    # Mix the original sound with the reverb effect
+    sound_with_reverb = sound_array + reverb
+    
+    if reverb_level < 0.5:
+        sound_with_reverb *= 0.4
+
+    return sound_with_reverb
 
 async def play_sound(pin):
     global sound_files, playing_sounds, adc
@@ -94,39 +118,55 @@ async def play_sound(pin):
         raw_distortion_value = adc.read_adc(2, gain=GAIN)
         percent_distortion_value = round((raw_distortion_value / 26362) * 100)
         
-        # Calculate distortion level based on the potentiometer value
-        distortion_level = percent_distortion_value - 50  # Center at 50
-        
         # Read the raw analog value from the reverb potentiometer channel (A3)
         raw_reverb_value = adc.read_adc(3, gain=GAIN)
         percent_reverb_value = round((raw_reverb_value / 26362) * 100)
         
-        # Calculate reverb level based on the potentiometer value
-        reverb_level = percent_reverb_value - 50  # Center at 50
-        
+        # Load the sound file
         sound = pygame.mixer.Sound(sound_file_path)
-        sound_array = pygame.sndarray.array(sound)
+        sound_array = pygame.sndarray.array(sound).astype(np.float32) / 32767.0  # Normalize to [-1, 1]
         
-        # Apply distortion effect using clipping
-        distorted_array = np.clip(sound_array * (1 + distortion_level / 100.0), -1, 1)
+        # Ensure the array matches the mixer channels
+        mixer_channels = pygame.mixer.get_init()[2]
+        if len(sound_array.shape) == 1 and mixer_channels == 2:
+            # Mono to stereo
+            sound_array = np.stack([sound_array, sound_array], axis=-1)
+        elif len(sound_array.shape) == 2 and sound_array.shape[1] != mixer_channels:
+            # Stereo to mono or incorrect stereo
+            if mixer_channels == 1:
+                sound_array = sound_array.mean(axis=1)
+            else:
+                sound_array = np.stack([sound_array.mean(axis=1)] * mixer_channels, axis=-1)
         
-        # Apply reverb effect using simple delay
-        reverb_delay = int(44100 * reverb_level / 100.0)  # Convert reverb level to number of samples
-        reverb_array = np.zeros_like(sound_array, dtype=np.float64)  # Ensure float64 dtype
-        reverb_array[reverb_delay:] = distorted_array[:-reverb_delay]
-        reverb_array += distorted_array.astype(np.float64) * 0.3  # Mix original and delayed signal
-
+        # Apply distortion effect if the distortion value is above 0
+        if percent_distortion_value > 0:
+            distortion_level = percent_distortion_value / 100.0  # Scale to [0, 1]
+            sound_array = np.clip(sound_array * (1 + distortion_level * 5), -1, 1)  # Increase distortion effect
+        
         # Convert back to int16 for pygame sound
-        reverb_array = np.clip(reverb_array, -1, 1)
-        reverb_array_int16 = (reverb_array * 32767).astype(np.int16)  # Scale to int16 range
-        reverb_sound = pygame.sndarray.make_sound(reverb_array_int16)
-
+        sound_array_int16 = (sound_array * 32767).astype(np.int16)
+        sound_array_int16 = np.ascontiguousarray(sound_array_int16)  # Ensure the array is C-contiguous
         
-        # Play the sound with distortion and reverb
-        reverb_sound.play()
+        # Create and play the processed sound
+        processed_sound = pygame.sndarray.make_sound(sound_array_int16)
+        processed_sound.play()
         
-        playing_sounds[pin] = reverb_sound
-
+        playing_sounds[pin] = processed_sound
+        
+        # Apply reverb effect if the reverb value is above 0
+        if percent_reverb_value > 0:
+            reverb_level = adjust_reverb_level(percent_reverb_value)  # Scale to [0, 1]
+            sound_array_with_reverb = await apply_reverb(sound_array, reverb_level)
+            
+            # Convert back to int16 for pygame sound
+            sound_array_with_reverb_int16 = (sound_array_with_reverb * 32767).astype(np.int16)
+            sound_array_with_reverb_int16 = np.ascontiguousarray(sound_array_with_reverb_int16)  # Ensure the array is C-contiguous
+            
+            # Create and play the processed sound with reverb
+            processed_sound_with_reverb = pygame.sndarray.make_sound(sound_array_with_reverb_int16)
+            processed_sound_with_reverb.play()
+            
+            playing_sounds[pin] = processed_sound_with_reverb
 
 
 async def button_release(pin):
@@ -205,10 +245,5 @@ async def broadcast_button_click(pin):
         *[ws.send(json.dumps({'type': 'button_click', 'pin': pin})) for ws in connected_clients]
     )
 
-async def preload_sound_files():
-    for pin, sound in assigned_sounds.items():
-        if sound:
-            await download_sound(pin, sound)
-
-asyncio.run(preload_sound_files())
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
