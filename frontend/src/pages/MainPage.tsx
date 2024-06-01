@@ -32,7 +32,7 @@ const MainPage = () => {
 
 	useEffect(() => {
 		// Initialize the WebSocket connection
-		socket.current = new WebSocket('ws://192.168.0.201:8765');
+		socket.current = new WebSocket('ws://192.168.0.196:8765');
 	
 		socket.current.onopen = () => {
 			console.log('WebSocket connection established.');
