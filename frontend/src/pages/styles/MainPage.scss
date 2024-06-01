@@ -67,7 +67,7 @@
 				flex-direction: column;
 				align-items: center;
 				gap: 10px;
-				transform: perspective(1000px) rotateX(40deg) !important;
+				transform: perspective(1000px) rotateX(-40deg)  !important;
 
 				label,
 				span {
@@ -79,6 +79,7 @@
 
 				input[type='range'] {
 					-webkit-appearance: none;
+					transform: rotate(180deg);
 					width: 15px;
 					height: 170px;
 					writing-mode: vertical-lr;
