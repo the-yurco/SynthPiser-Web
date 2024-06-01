@@ -32,7 +32,7 @@ const MainPage = () => {
 
 	useEffect(() => {
 		// Initialize the WebSocket connection
-		socket.current = new WebSocket('ws://192.168.0.196:8765');
+		socket.current = new WebSocket('ws://192.168.0.201:8765');
 	
 		socket.current.onopen = () => {
 			console.log('WebSocket connection established.');
@@ -54,6 +54,20 @@ const MainPage = () => {
 	useEffect(() => {
 		fetchSounds(query);
 	}, [query]);
+
+	useEffect(() => {
+		if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+			console.log('Sending reverb value to backend:', leftSliderValue);
+			socket.current.send(JSON.stringify({ type: 'reverb', value: leftSliderValue }));
+		}
+	}, [leftSliderValue]);
+
+	useEffect(() => {
+		if (socket.current && socket.current.readyState === WebSocket.OPEN) {
+			console.log('Sending distortion value to backend:', rightSliderValue);
+			socket.current.send(JSON.stringify({ type: 'distortion', value: rightSliderValue }));
+		}
+	}, [rightSliderValue]);
 
 	const fetchSounds = async (searchQuery: string) => {
 		try {
