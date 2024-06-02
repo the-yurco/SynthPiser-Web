@@ -14,6 +14,7 @@ export interface Sound {
 	previews: {
 		'preview-hq-mp3': string;
 	};
+	preview: string;
 	tags: string[] | undefined;
 }
 
@@ -114,19 +115,20 @@ const MainPage = () => {
 		fetchSounds(query);
 	};
 
-	const handlePresetSelect = (presetSounds: Sound[]) => {
+	const handlePresetSelect = (presetSounds: (Sound | null)[]) => {
 		setAssignedSounds(presetSounds);
-		console.log('Sending preset to backend:', presetSounds);
-		presetSounds.forEach((sound, index) => {
-		  const pin = buttonPins[index];
-		  console.log('Sending sound to backend:', { pin, sound });
-		  if (socket.current) {
-			socket.current.send(JSON.stringify({ type: 'assign_sound', pin, sound }));
-		  }
+		console.log(presetSounds);
+	  
+		const soundsToSend = presetSounds.map((sound, index) => {
+			const pin = buttonPins[index];
+			return sound ? { pin, sound: sound.preview } : { pin, sound: null };
 		});
-	  };
+	
+		if (socket.current) {
+			socket.current.send(JSON.stringify({ type: 'assign_sounds_batch', sounds: soundsToSend }));
+		}
+	};	
 		
-
 	const buttonPins = [
 		5, 6, 13, 19, 26, 16, 20, 21, 4, 17, 27, 22, 24, 25, 23, 18
 	];
@@ -134,40 +136,41 @@ const MainPage = () => {
 	const handleButtonSoundClick = (sound: Sound, index: number) => {
 		const newAssignedSounds = [...assignedSounds];
 		newAssignedSounds[index] = sound;
-		const audio = sound.previews['preview-hq-mp3'];
+		const soundPreview = sound.previews['preview-hq-mp3'];
 		setAssignedSounds(newAssignedSounds);
-
+	  
 		// Send the selected sound to the backend
 		if (sound && socket.current) {
-			const pin = buttonPins[index];
-			console.log('Sending sound to backend:', { pin, sound });
-			socket.current.send(JSON.stringify({ type: 'assign_sound', pin, sound }));
+		  const pin = buttonPins[index];
+		  console.log('Sending sound to backend:', { pin, sound: soundPreview });
+		  socket.current.send(JSON.stringify({ type: 'assign_sound', pin, sound: soundPreview }));
 		}
 		if (audioRef.current) {
-			audioRef.current.pause();
-			audioRef.current.currentTime = 0;
-			setSelectedSound(null);
+		  audioRef.current.pause();
+		  audioRef.current.currentTime = 0;
+		  setSelectedSound(null);
 		}
-	};
+	  };	  
 
-	const handleButtonSoundDrop = (
+	  const handleButtonSoundDrop = (
 		index: number,
 		e: React.DragEvent<HTMLButtonElement>
-	) => {
+	  ) => {
 		e.preventDefault();
 		const soundData = e.dataTransfer.getData('sound');
 		const sound = JSON.parse(soundData);
 		const newAssignedSounds = [...assignedSounds];
 		newAssignedSounds[index] = sound;
 		setAssignedSounds(newAssignedSounds);
-
+	  
 		// Send the selected sound to the backend
 		if (sound && socket.current) {
-			const pin = buttonPins[index];
-			console.log('Sending sound to backend:', { pin, sound });
-			socket.current.send(JSON.stringify({ type: 'assign_sound', pin, sound }));
+		  const pin = buttonPins[index];
+		  const soundPreview = sound.previews['preview-hq-mp3'];
+		  console.log('Sending sound to backend:', { pin, sound: soundPreview });
+		  socket.current.send(JSON.stringify({ type: 'assign_sound', pin, sound: soundPreview }));
 		}
-	};
+	  };	  
 
 	const handleButtonSoundDragOver = (e: React.DragEvent<HTMLButtonElement>) => {
 		e.preventDefault();

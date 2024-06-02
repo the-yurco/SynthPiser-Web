@@ -7,50 +7,50 @@ interface Preset {
 }
 
 interface PresetsDropdownProps {
-  handlePresetSelect: (sounds: Sound[]) => void;
-  socket: WebSocket | null; // Add socket prop
-  buttonPins: number[]; // Add buttonPins prop
-  assignedSounds: (Sound | null)[]; // Add assignedSounds prop
+  handlePresetSelect: (sounds: (Sound)[]) => void;
+  socket: WebSocket | null;
+  buttonPins: number[];
+  assignedSounds: (Sound | null)[];
 }
 
 const PresetsDropdown: React.FC<PresetsDropdownProps> = ({ handlePresetSelect, socket, buttonPins, assignedSounds }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [selectedPreset, setSelectedPreset] = useState<Preset>({ name: 'No Preset', sounds: [] }); // Change to string
+  const [selectedPreset, setSelectedPreset] = useState<Preset>({ name: 'No Preset', sounds: [] });
   const [pianoSounds, setPianoSounds] = useState<Sound[]>([]);
 
   useEffect(() => {
     const fetchPianoSounds = async () => {
       try {
         const apiKey = 'Aj9x06vq60VC37YLo9psCPwzvEIyTu0eBQfphtoz';
-        const packId = '4409'; // Pack ID from the provided link
-        const response = await fetch(`https://freesound.org/apiv2/packs/${packId}/sounds/?token=${apiKey}`);
-        const data = await response.json();
-
-        // Extract IDs and names of the piano sounds
-        const pianoSoundsData = data.results.filter((sound: { name: string; tags: string[] }) =>
-          sound.tags.includes('keyboard') && sound.tags.includes('note')
-        );
-        const fetchedPianoSounds: Sound[] = pianoSoundsData.map((sound: { id: number; name: string }) => ({
-          id: sound.id,
-          name: sound.name,
-          url: `https://freesound.org/apiv2/sounds/${sound.id}/download/?token=${apiKey}`,
-        }));
-
-        // Set piano sounds to the state
-        setPianoSounds(fetchedPianoSounds);
+        const packId = '4409';
+        const packResponse = await fetch(`https://freesound.org/apiv2/packs/${packId}/sounds/?token=${apiKey}`);
+        const packData = await packResponse.json();
+    
+        const soundRequests = packData.results.map(async (sound: { id: number }) => {
+          const soundResponse = await fetch(`https://freesound.org/apiv2/sounds/${sound.id}/?token=${apiKey}`);
+          const soundData = await soundResponse.json();
+          return {
+            id: soundData.id,
+            name: soundData.name,
+            preview: soundData.previews['preview-hq-mp3']
+          };
+        });
+    
+        const soundObjects = await Promise.all(soundRequests);
+    
+        setPianoSounds(soundObjects);
       } catch (error) {
         console.error('Error fetching piano sounds from the pack:', error);
       }
-    };
+    };    
 
     fetchPianoSounds();
   }, []);
 
   const presets: Preset[] = [
-    { name: 'No Preset', sounds: [] }, // Default option with no sounds
+    { name: 'No Preset', sounds: [] },
     { name: 'Piano Notes', sounds: pianoSounds },
-    { name: 'Guitar Chords', sounds: [] }, // Add your sounds here
-    // Add more presets as needed
+    { name: 'Guitar Chords', sounds: [] },
   ];
 
   const handlePresetClick = (preset: Preset) => {
@@ -64,12 +64,11 @@ const PresetsDropdown: React.FC<PresetsDropdownProps> = ({ handlePresetSelect, s
     }
     // Ensure that soundsToSet has 16 elements (fill with null if necessary)
     soundsToSet = soundsToSet.concat(Array(Math.max(16 - soundsToSet.length, 0)).fill(null));
-    
-    handlePresetSelect(soundsToSet);
+    handlePresetSelect(soundsToSet as (Sound)[]);
     setSelectedPreset(preset);
     setIsOpen(false);
   };
-  
+
   return (
     <div className="presets">
       <div className="presets-dropdown">
@@ -79,7 +78,7 @@ const PresetsDropdown: React.FC<PresetsDropdownProps> = ({ handlePresetSelect, s
         {isOpen && (
           <div className="dropdown-menu">
             {presets
-              .filter((preset) => preset.name !== selectedPreset.name) // Filter out the selected preset
+              .filter((preset) => preset.name !== selectedPreset.name)
               .map((preset, index) => (
                 <button
                   className="preset-button-dropdown"
