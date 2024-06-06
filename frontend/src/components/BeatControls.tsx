@@ -1,160 +1,205 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-	FaPlay,
-	FaPause,
-	FaStop,
-	FaRedo,
-	FaCircle,
-	FaSquare,
-	FaReply
+  FaPlay,
+  FaPause,
+  FaStop,
+  FaRedo,
+  FaSquare,
+  FaReply
 } from 'react-icons/fa';
 
-type BeatControlsProps = {
-	socket: WebSocket | null;
+type Sound = {
+  id: number;
+  preview: string;
 };
 
-const BeatControls = ({ socket }: BeatControlsProps) => {
-	const [timerValue, setTimerValue] = useState<number>(0);
-	const [isPlaying, setIsPlaying] = useState<boolean>(false);
-	const [timerRunning, setTimerRunning] = useState<boolean>(false);
-	const [recordedButtons, setRecordedButtons] = useState<number[]>([]);
-	const [axisPosition, setAxisPosition] = useState<number>(0);
+type BeatControlsProps = {
+  socket: WebSocket | null;
+  assignedSounds: { [pin: number]: string | null };
+};
 
-	const timerRef = useRef<number | null>(null);
-	const replayRef = useRef<boolean>(false);
+const BeatControls = ({ socket, assignedSounds }: BeatControlsProps) => {
+  const [timerValue, setTimerValue] = useState<number>(0);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [recordedButtons, setRecordedButtons] = useState<{ time: number, pin: number }[]>([]);
+  const [axisPosition, setAxisPosition] = useState<number>(0);
 
-	const togglePlayPause = () => {
-		setIsPlaying(!isPlaying);
-		if (!timerRunning) {
-			setTimerValue(0);
-			setTimerRunning(true);
-			timerRef.current = window.setInterval(() => {
-				setTimerValue((prevValue) => {
-					if (prevValue >= 10000) {
-						setTimerRunning(false);
-						window.clearInterval(timerRef.current!);
-						return 0;
-					}
-					return prevValue + 10; // Increase by 10 milliseconds
-				});
-			}, 10); // Update every 10 milliseconds
-		} else {
-			setTimerRunning(false);
-			window.clearInterval(timerRef.current!);
-		}
-	};
+  const timerRef = useRef<number | null>(null);
+  const audioRefs = useRef<{ [pin: number]: HTMLAudioElement | null }>(
+    Object.keys(assignedSounds).reduce((acc, pin) => {
+      acc[parseInt(pin)] = null;
+      return acc;
+    }, {} as { [pin: number]: HTMLAudioElement | null })
+  );
 
-	const stopPlayback = () => {
-		setIsPlaying(false);
-		setTimerRunning(false);
-		setTimerValue(0);
-		setAxisPosition(0);
-		if (timerRef.current) {
-			clearInterval(timerRef.current);
-		}
-	};
+  const togglePlayPause = () => {
+    console.log(`Toggle Play/Pause: ${!isPlaying ? 'Play' : 'Pause'}`);
+    if (!isPlaying) {
+      // If not playing, send recorded buttons to backend
+      sendRecordedButtons();
+      startTimer();
+    } else {
+      pauseTimer();
+    }
+  };
 
-	const resetTimer = () => {
-		setRecordedButtons([]);
-		setTimerValue(0);
-		setAxisPosition(0);
-	};
+  const sendRecordedButtons = () => {
+    // Extract pin numbers and timestamps
+    const pins = recordedButtons.map(button => button.pin);
+    const timestamps = recordedButtons.map(button => button.time);
+  
+    // Create a message object containing the pins and timestamps
+    const message = {
+      type: 'recorded_buttons',
+      pins: pins,
+      timestamps: timestamps
+    };
+  
+    // Send the message via WebSocket
+    if (socket) {
+      socket.send(JSON.stringify(message));
+    }
+  };
 
-	const handleButtonPress = (pin: number) => {
-		setRecordedButtons((prevButtons) => [...prevButtons, timerValue]);
-	};
+  const startTimer = () => {
+    console.log('Starting timer...');
+    setIsPlaying(true);
+    timerRef.current = window.setInterval(() => {
+      setTimerValue((prevValue) => {
+        const newValue = prevValue + 10;
+        if (newValue >= 10000) {
+          console.log('Timer reached 10000 ms, stopping timer...');
+          pauseTimer();
+          setTimerValue(0);
+          setAxisPosition(0);
+          return 0;
+        }
+        checkAndPlaySounds(newValue);
+        return newValue;
+      });
+    }, 10);
+  };
 
-	const handleClearRecordedButtons = () => {
-		setRecordedButtons([]);
-	};
+  const pauseTimer = () => {
+    console.log('Pausing timer...');
+    setIsPlaying(false);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
 
-	const handleReplay = () => {
-		if (recordedButtons.length > 0) {
-			setIsPlaying(true);
-			setTimerValue(0);
-			setAxisPosition(0);
-			replayRef.current = true;
-		}
-	};
+  const stopPlayback = () => {
+    console.log('Stopping playback...');
+    setIsPlaying(false);
+    setTimerValue(0);
+    setAxisPosition(0);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
 
-	useEffect(() => {
-		if (socket) {
-			socket.onmessage = (event) => {
-				console.log('Received message:', event.data);
-				const data = JSON.parse(event.data);
-				if (data.type === 'button_click' && data.pin) {
-					setRecordedButtons((prevButtons) => [...prevButtons, timerValue]);
-				}
-			};
-		}
-	}, [socket, timerValue]);
+  const resetTimer = () => {
+    console.log('Resetting timer and clearing recorded buttons...');
+    setRecordedButtons([]);
+    setTimerValue(0);
+    setAxisPosition(0);
+  };
 
-	useEffect(() => {
-		if (isPlaying) {
-			let index = 0;
-			const interval = setInterval(() => {
-				if (index < recordedButtons.length) {
-					setTimerValue(recordedButtons[index]);
-					setAxisPosition((recordedButtons[index] / 10000) * 100); // Update axis position
-					index++;
-				} else {
-					clearInterval(interval);
-					setIsPlaying(false);
-					if (replayRef.current) {
-						replayRef.current = false;
-						setTimeout(() => {
-							togglePlayPause();
-						}, 500);
-					}
-				}
-			}, 10);
-			return () => clearInterval(interval);
-		}
-	}, [isPlaying, recordedButtons]);
+  const handleButtonPress = (pin: number) => {
+    const currentTime = timerValue;
+    console.log(`Button pressed at time: ${currentTime} ms`);
+    setRecordedButtons((prevButtons) => [...prevButtons, { time: currentTime, pin }]);
+  };
 
-	const formatMilliseconds = (ms: number): string => {
-		const seconds = Math.floor(ms / 1000);
-		const milliseconds = (ms % 1000).toString().padStart(3, '0');
-		return `${seconds}.${milliseconds} s`;
-	};
+  const handleClearRecordedButtons = () => {
+    console.log('Clearing recorded buttons...');
+    setRecordedButtons([]);
+  };
 
-	return (
-		<div className="beat-controls">
-			<div className="timer-display">
-				<span>{formatMilliseconds(timerValue)}</span>
-			</div>
-			<div className="timer-axis">
-				{recordedButtons.map((time, index) => (
-					<div
-						key={index}
-						className="button-indicator"
-						style={{ left: `${(time / 10000) * 100}%` }}
-					></div>
-				))}
-				<div
-					className="timer-axis-display"
-					style={{ left: `${axisPosition}%` }}
-				></div>
-			</div>
-			<div className="playback-controls">
-				<button onClick={togglePlayPause}>
-					{isPlaying ? <FaPause /> : <FaPlay />} {isPlaying ? 'Pause' : 'Play'}
-				</button>
-				<button onClick={stopPlayback}>
-					<FaStop /> Stop
-				</button>
-				<button onClick={resetTimer}>
-					<FaRedo /> Reset
-				</button>
-				<button onClick={handleClearRecordedButtons}>
-					<FaSquare /> Clear Recorded
-				</button>
-				<button onClick={handleReplay}>
-					<FaReply /> Replay
-				</button>
-			</div>
-		</div>
-	);
+  const checkAndPlaySounds = (currentTime: number) => {
+    recordedButtons.forEach(({ time, pin }) => {
+      if (time === currentTime) {
+        console.log(`Playing sound for recorded button at time: ${time} ms`);
+        console.log(`Pin: ${pin}`);
+        console.log(assignedSounds);
+        const soundUrl = assignedSounds[pin];
+        if (soundUrl) {
+          console.log(`Playing sound at pin: ${pin} url: ${soundUrl}`);
+          const audioRef = audioRefs.current[pin];
+          if (audioRef) {
+            audioRef.currentTime = 0;
+            audioRef.play();
+          }
+        }
+      }
+    });
+  };
+
+  useEffect(() => {
+    if (socket) {
+      socket.onmessage = (event) => {
+        console.log('Received message from socket:', event.data);
+        const data = JSON.parse(event.data);
+        if (data.type === 'button_click' && data.pin) {
+          console.log(`Button click received from pin ${data.pin}`);
+          handleButtonPress(data.pin);
+        }
+      };
+    }
+  }, [socket, timerValue]);
+
+  const formatMilliseconds = (ms: number): string => {
+    const seconds = Math.floor(ms / 1000);
+    const milliseconds = (ms % 1000).toString().padStart(3, '0');
+    return `${seconds}.${milliseconds} s`;
+  };
+
+  return (
+    <div className="beat-controls">
+      <div className="timer-display">
+        <span>{formatMilliseconds(timerValue)}</span>
+      </div>
+      <div className="timer-axis">
+        {recordedButtons.map((button, index) => (
+          <div
+            key={index}
+            className="button-indicator"
+            style={{ left: `${(button.time / 10000) * 100}%` }}
+          ></div>
+        ))}
+        <div
+          className="timer-axis-display"
+          style={{ left: `${(axisPosition / 10000) * 100}%` }}
+        ></div>
+      </div>
+      <div className="playback-controls">
+        <button onClick={togglePlayPause}>
+          {isPlaying ? <FaPause /> : <FaPlay />} {isPlaying ? 'Pause' : 'Play'}
+        </button>
+        <button onClick={stopPlayback}>
+          <FaStop /> Stop
+        </button>
+        <button onClick={resetTimer}>
+          <FaRedo /> Reset
+        </button>
+        <button onClick={handleClearRecordedButtons}>
+          <FaSquare /> Clear Recorded
+        </button>
+      </div>
+      {Object.entries(assignedSounds).map(([pin, soundUrl]) => (
+        <audio
+          key={pin}
+          ref={(el) => (audioRefs.current[parseInt(pin)] = el)}
+          src={soundUrl || undefined}
+          preload="auto"
+          onCanPlayThrough={() => console.log(`Audio for pin ${pin} loaded successfully`)}
+          onError={(e) => console.error(`Error loading audio for pin ${pin}:`, e)}
+        ></audio>
+      ))}
+    </div>
+  );
 };
 
 export default BeatControls;

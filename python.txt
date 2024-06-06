@@ -5,9 +5,9 @@ import pygame
 import requests
 import RPi.GPIO as GPIO
 import websockets
-from Adafruit_ADS1x15 import ADS1115
 import numpy as np
-from pysndfx import AudioEffectsChain
+import time
+from collections import deque
 
 # Initialize Pygame mixer
 pygame.mixer.init(frequency=44100, size=-16, channels=2)
@@ -20,13 +20,7 @@ button_pressed = {pin: False for pin in button_pins}
 connected_clients = set()
 distortion_value = 0
 reverb_value = 0
-
-# Set I2C bus number
-I2C_BUS_NUM = 1
-# Create an ADS1115 ADC object at address 0x48
-adc = ADS1115(address=0x48, busnum=I2C_BUS_NUM)
-# Set the gain to Â±4.096V (adjust if needed)
-GAIN = 1
+recorded_buttons = deque()
 
 async def handle_message(websocket):
     global connected_clients, sound_files, playing_sounds, assigned_sounds, distortion_value, reverb_value
@@ -43,11 +37,26 @@ async def handle_message(websocket):
             data = json.loads(message)
             if data['type'] == 'assign_sound':
                 pin = data['pin']
-                sound = data['sound']
-                if assigned_sounds[pin] != sound:
-                    assigned_sounds[pin] = sound
-                    await download_sound(pin, sound)
+                sound_url = data['sound']
+                if assigned_sounds[pin] != sound_url:
+                    assigned_sounds[pin] = sound_url
+                    if sound_url:
+                        await download_sound(pin, sound_url)
+                    else:
+                        sound_files[pin] = None
                     await broadcast_assigned_sounds()
+            elif data['type'] == 'assign_sounds_batch':
+                sounds_batch = data['sounds']
+                for assignment in sounds_batch:
+                    pin = assignment['pin']
+                    sound_url = assignment['sound']
+                    if assigned_sounds[pin] != sound_url:
+                        assigned_sounds[pin] = sound_url
+                        if sound_url:
+                            await download_sound(pin, sound_url)
+                        else:
+                            sound_files[pin] = None
+                await broadcast_assigned_sounds()
             elif data['type'] == 'reverb':
                 # Handle incoming reverb value update
                 reverb_value = data['value']
@@ -58,13 +67,17 @@ async def handle_message(websocket):
                 distortion_value = data['value']
                 print("Received distortion value:", distortion_value)
                 # Implement logic to update distortion value processing here
+            elif data['type'] == 'recorded_buttons':
+                pins = data['pins']
+                timestamps = data['timestamps']
+                recorded_buttons = deque(sorted(zip(pins, timestamps), key=lambda x: x[1]))  # Sort buttons based on timestamps
+                await play_recorded_buttons()
+                recorded_buttons.clear() 
     except websockets.exceptions.ConnectionClosedError:
         print("Client disconnected:", websocket.remote_address)
         pass
     finally:
         connected_clients.remove(websocket)
-
-
 
 async def broadcast_assigned_sounds():
     global connected_clients
@@ -72,9 +85,8 @@ async def broadcast_assigned_sounds():
         *[ws.send(json.dumps({'type': 'assigned_sounds', 'sounds': assigned_sounds})) for ws in connected_clients]
     )
 
-async def download_sound(pin, sound):
+async def download_sound(pin, sound_url):
     global sound_files
-    sound_url = sound['previews']['preview-hq-mp3']
     sound_file_path = f"sound_{pin}.mp3"
 
     if os.path.exists(sound_file_path):
@@ -90,7 +102,7 @@ async def download_sound(pin, sound):
         print(f"Failed to retrieve sound file from {sound_url}. Status code: {response.status_code}")
 
 async def button_click(pin):
-    global button_pressed, adc
+    global button_pressed  # , adc  # Commented out adc
 
     if button_pressed[pin]:
         return
@@ -98,24 +110,16 @@ async def button_click(pin):
     button_pressed[pin] = True
     print(f"Button on pin {pin} clicked")
 
-    # Read the raw analog value from the reverb potentiometer channel (A3)
-    raw_reverb_value = adc.read_adc(3, gain=GAIN)
-    percent_reverb_value = round((raw_reverb_value / 26362) * 100)
-
-    # Read the raw analog value from the distortion potentiometer channel (A2)
-    raw_distortion_value = adc.read_adc(2, gain=GAIN)
-    percent_distortion_value = round((raw_distortion_value / 26362) * 100)
-
     if pin in playing_sounds:
         playing_sounds[pin].stop()
         del playing_sounds[pin]
 
-    await play_sound(pin)
+    if assigned_sounds[pin] is not None:
+        await play_sound(pin)
 
     if sound_files.get(pin):
         await broadcast_button_click(pin)
 
-        
 def adjust_reverb_level(percent_reverb_value):
     # Apply a nonlinear scaling function to compress the range of lower values more aggressively
     scaled_reverb_level = (percent_reverb_value / 100.0) ** 2  # Example nonlinear scaling function
@@ -140,7 +144,7 @@ async def apply_reverb(sound_array, reverb_level):
     return sound_with_reverb
 
 async def play_sound(pin):
-    global sound_files, playing_sounds, adc, reverb_value, distortion_value
+    global sound_files, playing_sounds  # , adc, reverb_value, distortion_value  # Commented out adc
 
     sound_file_path = sound_files.get(pin)
     if sound_file_path:
@@ -191,8 +195,6 @@ async def play_sound(pin):
             
             playing_sounds[pin] = processed_sound_with_reverb
 
-
-
 async def button_release(pin):
     global button_pressed
     button_pressed[pin] = False
@@ -219,30 +221,30 @@ async def read_potentiometer():
     
     while True:
         # Read the raw analog value from channel A2 for distortion
-        raw_distortion_value = adc.read_adc(2, gain=GAIN)
+        # raw_distortion_value = adc.read_adc(2, gain=GAIN)  # Commented out
         # Scale the raw value to a percentage (0-100)
-        percent_distortion_value = round((raw_distortion_value / 26362) * 100)
+        # percent_distortion_value = round((raw_distortion_value / 26362) * 100)  # Commented out
         
         # Read the raw analog value from channel A3 for reverb
-        raw_reverb_value = adc.read_adc(3, gain=GAIN)
+        # raw_reverb_value = adc.read_adc(3, gain=GAIN)  # Commented out
         # Scale the raw value to a percentage (0-100)
-        percent_reverb_value = round((raw_reverb_value / 26362) * 100)
+        # percent_reverb_value = round((raw_reverb_value / 26362) * 100)  # Commented out
         
         # Check if distortion value changed by 5% or more
-        if prev_distortion_value is None or abs(percent_distortion_value - prev_distortion_value) >= 5:
+        # if prev_distortion_value is None or abs(percent_distortion_value - prev_distortion_value) >= 5:
             # Broadcast the distortion value to all connected clients
-            await broadcast_potentiometer_value('distortion', percent_distortion_value)
+            # await broadcast_potentiometer_value('distortion', percent_distortion_value)
             # Update previous distortion value
-            distortion_value = percent_distortion_value
-            prev_distortion_value = percent_distortion_value
+            # distortion_value = percent_distortion_value
+            # prev_distortion_value = percent_distortion_value
         
         # Check if reverb value changed by 5% or more
-        if prev_reverb_value is None or abs(percent_reverb_value - prev_reverb_value) >= 5:
+        # if prev_reverb_value is None or abs(percent_reverb_value - prev_reverb_value) >= 5:
             # Broadcast the reverb value to all connected clients
-            await broadcast_potentiometer_value('reverb', percent_reverb_value)
+            # await broadcast_potentiometer_value('reverb', percent_reverb_value)
             # Update previous reverb value
-            reverb_value = percent_reverb_value
-            prev_reverb_value = percent_reverb_value
+            # reverb_value = percent_reverb_value
+            # prev_reverb_value = percent_reverb_value
         
         # Delay for a short interval before reading again
         await asyncio.sleep(1)
@@ -261,8 +263,8 @@ async def broadcast_potentiometer_value(potentiometer_type, value):
 async def main():
     await asyncio.gather(
         websockets.serve(handle_message, "0.0.0.0", 8765),
-        detect_button_clicks(),
-        read_potentiometer()
+        detect_button_clicks()
+        # read_potentiometer()  # Commented out for now
     )
 
 async def broadcast_button_click(pin):
@@ -271,6 +273,29 @@ async def broadcast_button_click(pin):
     await asyncio.gather(
         *[ws.send(json.dumps({'type': 'button_click', 'pin': pin})) for ws in connected_clients]
     )
+
+async def play_recorded_buttons():
+    global recorded_buttons, playing_sounds
+    print("Playing recorded buttons...")
+    start_time = time.time()
+    if recorded_buttons:
+        first_pin, first_timestamp = recorded_buttons.popleft()
+        elapsed_time = time.time() - start_time
+        next_timestamp = first_timestamp / 1000
+        wait_time = max(0, next_timestamp - elapsed_time)
+        await asyncio.sleep(wait_time)
+        print(f"Playing sound from pin {first_pin}...")
+        await play_sound(first_pin)
+        print(f"Seconds elapsed: {next_timestamp:.2f}")
+    for pin, timestamp in recorded_buttons:
+        elapsed_time = time.time() - start_time
+        next_timestamp = timestamp / 1000
+        wait_time = max(0, next_timestamp - elapsed_time)
+        await asyncio.sleep(wait_time)
+        print(f"Playing sound from pin {pin}...")
+        await play_sound(pin)
+        print(f"Seconds elapsed: {next_timestamp:.2f}")
+    print("Finished playing recorded buttons.")
 
 if __name__ == "__main__":
     asyncio.run(main())

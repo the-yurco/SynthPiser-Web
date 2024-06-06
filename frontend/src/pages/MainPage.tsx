@@ -250,7 +250,15 @@ const MainPage = () => {
 					</div>
 				</div>
 
-				<BeatControls socket={socket.current} />
+				<BeatControls
+					socket={socket.current}
+					assignedSounds={assignedSounds.reduce<{ [pin: number]: string | null }>((acc, sound, index) => {
+						if (sound) {
+						acc[buttonPins[index]] = sound.previews['preview-hq-mp3'];
+						}
+						return acc;
+					}, {})}
+				/>
 
 				<div className="embedded-keyboard">
 					{assignedSounds.map((sound, index) => (
