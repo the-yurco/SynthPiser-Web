@@ -146,8 +146,6 @@ def adjust_reverb_level(percent_reverb_value):
     return scaled_reverb_level
         
 async def apply_reverb(sound_array, reverb_level):
-    # Apply a spatial reverb effect
-    # You can adjust the reverb level and decay time for different effects
     decay = 0.5  # Adjust the decay time of the reverb effect
     reverb_samples = int(44100 * decay)
     reverb = np.zeros_like(sound_array)
@@ -280,14 +278,23 @@ async def broadcast_potentiometer_value(potentiometer_type, value):
         *[ws.send(message) for ws in connected_clients]
     )
     
+async def receive_messages():
+    global connected_clients
+    while True:
+        for ws in connected_clients:
+            message = await ws.recv()
+            yield message
+
 async def start_recording():
-    global recording, recorded_sounds, stop_requested
+    global recording, recorded_sounds, stop_requested, distortion_value, reverb_value
 
     print("Recording started...")
-    recorded_sounds = []
     recording = True
     start_time = time.time()  # Record the start time of the recording
     end_time = start_time + 120  # Set the end time to 2 minutes from the start time
+
+    # Start the coroutine for playing recorded sounds
+    play_recorded_task = asyncio.create_task(play_recorded_sounds(start_time))
 
     try:
         while recording and time.time() < end_time:  # Continue recording until 2 minutes have elapsed
@@ -297,26 +304,30 @@ async def start_recording():
                 if data['type'] == 'stop_recording':
                     print("Received stop recording")
                     stop_requested = True
+                    await stop_recording()
                     break  # Exit the recording loop
                 elif data['type'] == 'button_click':
                     pin = data['pin']
-                    timestamp = time.time() - start_time  # Calculate the timestamp relative to the start time
+                    timestamp = round(time.time() - start_time,2)  # Calculate the timestamp relative to the start time
                     distortion = distortion_value
                     reverb = reverb_value
                     recorded_sounds.append((pin, timestamp, distortion, reverb))
                     print(f"Button on pin {pin} recorded at {timestamp}")
+                elif data['type'] == 'reverb':
+                    # Handle incoming reverb value update
+                    reverb_value = data['value']
+                    print("Received reverb value:", reverb_value)
+                    # Implement logic to update reverb value processing here
+                elif data['type'] == 'distortion':
+                    # Handle incoming distortion value update
+                    distortion_value = data['value']
+                    print("Received distortion value:", distortion_value)
 
-            # Check for button clicks without waiting for messages
-            for pin in button_pins:
-                if GPIO.input(pin) == GPIO.LOW:
-                    timestamp = time.time() - start_time  # Calculate the timestamp relative to the start time
-                    distortion = distortion_value
-                    reverb = reverb_value
-                    recorded_sounds.append((pin, timestamp, distortion, reverb))
-                    print(f"Button on pin {pin} recorded at {timestamp}")
-
+            # Sort the recorded sounds by timestamp in ascending order
+            recorded_sounds.sort(key=lambda x: x[1])
+            
             # Sleep for a short interval before checking again
-            await asyncio.sleep(0.01)
+            await asyncio.sleep(0.1)
 
         # Stop recording if the time limit has been reached
         await stop_recording()
@@ -324,34 +335,34 @@ async def start_recording():
     except asyncio.CancelledError:
         print("Recording cancelled...")
         recording = False
-
-
-async def receive_messages():
-    global connected_clients
-    while True:
-        for ws in connected_clients:
-            message = await ws.recv()
-            yield message
+    finally:
+        # Cancel the playback coroutine when recording ends
+        play_recorded_task.cancel()
 
 async def stop_recording():
-    global recording, recorded_sounds, recording_event
+    global recording, recorded_sounds
     print("Recording stopped...")
     recording = False
+    
+    # Stop all currently playing sounds
+    pygame.mixer.stop()
+
     # You can process or save the recorded sounds here
     print("Recorded sounds:", recorded_sounds)
-    await play_recorded_buttons()
 
-async def play_recorded_buttons():
+async def play_recorded_sounds(start_time):
     global recorded_sounds
 
-    # Assuming you have a function to play recorded sounds
-    # Iterate over the recorded sounds and play them
     for sound in recorded_sounds:
         pin, timestamp, distortion, reverb = sound
-        # Play the recorded sound based on pin, distortion, and reverb
-        await play_recorded_sound(pin, distortion, reverb, timestamp)
+        # Calculate the absolute playback time based on the start time and timestamp
+        playback_time = start_time + timestamp
+        # Calculate the delay until the sound should start playing
+        delay = max(0, playback_time - time.time())
+        await asyncio.sleep(delay)
+        await play_recorded_sound(pin, distortion, reverb)
 
-async def play_recorded_sound(pin, distortion, reverb, timestamp):
+async def play_recorded_sound(pin, distortion, reverb):
     global sound_files
 
     sound_file_path = sound_files.get(pin)
@@ -359,20 +370,26 @@ async def play_recorded_sound(pin, distortion, reverb, timestamp):
         # Load the sound file
         sound = pygame.mixer.Sound(sound_file_path)
         sound_array = pygame.sndarray.array(sound).astype(np.float32) / 32767.0  # Normalize to [-1, 1]
-        
+
         # Apply distortion effect if the distortion level is above 0
         if distortion > 0:
             distortion_level = distortion / 100  # Scale to [0, 1]
             print("Distortion level:", distortion_level)
             sound_array = np.clip(sound_array * (1 + distortion_level * 10), -1, 1)  # Increase distortion effect
-        
+
+        # Apply reverb effect if the reverb level is above 0
+        if reverb > 0:
+            reverb_level = reverb / 100.0  # Scale to [0, 1]
+            sound_array = await apply_reverb(sound_array, reverb_level)
+
         # Convert back to int16 for pygame sound
         sound_array_int16 = (sound_array * 32767).astype(np.int16)
         sound_array_int16 = np.ascontiguousarray(sound_array_int16)  # Ensure the array is C-contiguous
-        
+
         # Create and play the processed sound
         processed_sound = pygame.sndarray.make_sound(sound_array_int16)
         processed_sound.play()
+
 
 async def main():
     await asyncio.gather(

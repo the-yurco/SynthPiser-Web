@@ -53,11 +53,35 @@ const PresetsDropdown: React.FC<PresetsDropdownProps> = ({ handlePresetSelect, s
     { name: 'Guitar Chords', sounds: [] },
   ];
 
-  const handlePresetClick = (preset: Preset) => {
+  const handlePresetClick = async (preset: Preset) => {
     let soundsToSet: Sound[] = [];
     if (preset.name === 'No Preset') {
       // Empty out the assignedSounds array
       soundsToSet = Array(16).fill(null);
+    } else if (preset.name === 'Piano Notes') {
+      // Fetch piano sounds
+      try {
+        const apiKey = 'Aj9x06vq60VC37YLo9psCPwzvEIyTu0eBQfphtoz';
+        const packId = '4409';
+        const packResponse = await fetch(`https://freesound.org/apiv2/packs/${packId}/sounds/?token=${apiKey}`);
+        const packData = await packResponse.json();
+    
+        const soundRequests = packData.results.map(async (sound: { id: number }) => {
+          const soundResponse = await fetch(`https://freesound.org/apiv2/sounds/${sound.id}/?token=${apiKey}`);
+          const soundData = await soundResponse.json();
+          return {
+            id: soundData.id,
+            name: soundData.name,
+            preview: soundData.previews['preview-hq-mp3']
+          };
+        });
+    
+        const soundObjects = await Promise.all(soundRequests);
+    
+        soundsToSet = soundObjects;
+      } catch (error) {
+        console.error('Error fetching piano sounds from the pack:', error);
+      }
     } else {
       // Update soundsToSet with the sounds from the preset
       soundsToSet = preset.sounds;
