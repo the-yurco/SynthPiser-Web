@@ -1,12 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import {
-  FaPlay,
-  FaPause,
-  FaStop,
-  FaRedo,
-  FaSquare,
-  FaReply
-} from 'react-icons/fa';
+import { FaPlay, FaPause, FaStop, FaRedo, FaSquare } from 'react-icons/fa';
 
 type Sound = {
   id: number;
@@ -35,27 +28,19 @@ const BeatControls = ({ socket, assignedSounds }: BeatControlsProps) => {
   const togglePlayPause = () => {
     console.log(`Toggle Play/Pause: ${!isPlaying ? 'Play' : 'Pause'}`);
     if (!isPlaying) {
-      // If not playing, send recorded buttons to backend
-      sendRecordedButtons();
+      sendMessage('start_recording');
       startTimer();
     } else {
+      console.log('sending message : stop_recording');
+      sendMessage('stop_recording');
       pauseTimer();
     }
   };
 
-  const sendRecordedButtons = () => {
-    // Extract pin numbers and timestamps
-    const pins = recordedButtons.map(button => button.pin);
-    const timestamps = recordedButtons.map(button => button.time);
-  
-    // Create a message object containing the pins and timestamps
+  const sendMessage = (messageType: string) => {
     const message = {
-      type: 'recorded_buttons',
-      pins: pins,
-      timestamps: timestamps
+      type: messageType
     };
-  
-    // Send the message via WebSocket
     if (socket) {
       socket.send(JSON.stringify(message));
     }
@@ -74,7 +59,7 @@ const BeatControls = ({ socket, assignedSounds }: BeatControlsProps) => {
           setAxisPosition(0);
           return 0;
         }
-        checkAndPlaySounds(newValue);
+        setAxisPosition(newValue);
         return newValue;
       });
     }, 10);
@@ -98,10 +83,11 @@ const BeatControls = ({ socket, assignedSounds }: BeatControlsProps) => {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+    sendMessage('stop_recording');
   };
 
   const resetTimer = () => {
-    console.log('Resetting timer and clearing recorded buttons...');
+    console.log('Resetting timer...');
     setRecordedButtons([]);
     setTimerValue(0);
     setAxisPosition(0);
@@ -113,30 +99,6 @@ const BeatControls = ({ socket, assignedSounds }: BeatControlsProps) => {
     setRecordedButtons((prevButtons) => [...prevButtons, { time: currentTime, pin }]);
   };
 
-  const handleClearRecordedButtons = () => {
-    console.log('Clearing recorded buttons...');
-    setRecordedButtons([]);
-  };
-
-  const checkAndPlaySounds = (currentTime: number) => {
-    recordedButtons.forEach(({ time, pin }) => {
-      if (time === currentTime) {
-        console.log(`Playing sound for recorded button at time: ${time} ms`);
-        console.log(`Pin: ${pin}`);
-        console.log(assignedSounds);
-        const soundUrl = assignedSounds[pin];
-        if (soundUrl) {
-          console.log(`Playing sound at pin: ${pin} url: ${soundUrl}`);
-          const audioRef = audioRefs.current[pin];
-          if (audioRef) {
-            audioRef.currentTime = 0;
-            audioRef.play();
-          }
-        }
-      }
-    });
-  };
-
   useEffect(() => {
     if (socket) {
       socket.onmessage = (event) => {
@@ -145,6 +107,7 @@ const BeatControls = ({ socket, assignedSounds }: BeatControlsProps) => {
         if (data.type === 'button_click' && data.pin) {
           console.log(`Button click received from pin ${data.pin}`);
           handleButtonPress(data.pin);
+          socket.send(JSON.stringify({ type: 'button_click', pin: data.pin }));
         }
       };
     }
@@ -183,9 +146,6 @@ const BeatControls = ({ socket, assignedSounds }: BeatControlsProps) => {
         </button>
         <button onClick={resetTimer}>
           <FaRedo /> Reset
-        </button>
-        <button onClick={handleClearRecordedButtons}>
-          <FaSquare /> Clear Recorded
         </button>
       </div>
       {Object.entries(assignedSounds).map(([pin, soundUrl]) => (
