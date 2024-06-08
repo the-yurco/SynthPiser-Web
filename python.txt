@@ -8,6 +8,8 @@ import websockets
 from Adafruit_ADS1x15 import ADS1115
 import numpy as np
 import time
+import aiohttp
+import aiofiles
 
 # Initialize Pygame mixer
 pygame.mixer.init(frequency=44100, size=-16, channels=2)
@@ -33,7 +35,7 @@ adc = ADS1115(address=0x48, busnum=I2C_BUS_NUM)
 GAIN = 1
 
 async def handle_message(websocket):
-    global connected_clients, sound_files, playing_sounds, assigned_sounds, distortion_value, reverb_value, stop_requested
+    global connected_clients, sound_files, playing_sounds, assigned_sounds, distortion_value, reverb_value, stop_requested, recorded_sounds
     connected_clients.add(websocket)
     sound_files = {}  # Reset sound_files dictionary when a new client connects
     playing_sounds = {}  # Reset playing_sounds dictionary when a new client connects
@@ -42,6 +44,7 @@ async def handle_message(websocket):
         print("Client connected:", websocket.remote_address)
         distortion_value = 0
         reverb_value = 0
+        recorded_sounds = []
         async for message in websocket:
             print("Received message:", message)
             data = json.loads(message)
@@ -104,15 +107,15 @@ async def download_sound(pin, sound_url):
     if os.path.exists(sound_file_path):
         os.remove(sound_file_path)
 
-    response = requests.get(sound_url)
-    if response.status_code == 200:
-        with open(sound_file_path, 'wb') as f:
-            f.write(response.content)
+    async with aiohttp.ClientSession() as session:
+        async with session.get(sound_url) as response:
+            if response.status == 200:
+                async with aiofiles.open(sound_file_path, 'wb') as f:
+                    await f.write(await response.read())
+                sound_files[pin] = sound_file_path
+            else:
+                print(f"Failed to retrieve sound file from {sound_url}. Status code: {response.status}")
         
-        sound_files[pin] = sound_file_path
-    else:
-        print(f"Failed to retrieve sound file from {sound_url}. Status code: {response.status_code}")
-
 async def button_click(pin):
     global button_pressed, adc
 
@@ -282,8 +285,12 @@ async def receive_messages():
     global connected_clients
     while True:
         for ws in connected_clients:
-            message = await ws.recv()
-            yield message
+            try:
+                message = await ws.recv()
+                yield message
+            except websockets.exceptions.ConnectionClosed:
+                connected_clients.remove(ws)
+                break
 
 async def start_recording():
     global recording, recorded_sounds, stop_requested, distortion_value, reverb_value
@@ -298,7 +305,13 @@ async def start_recording():
 
     try:
         while recording and time.time() < end_time:  # Continue recording until 2 minutes have elapsed
-            async for message in receive_messages():
+            time_remaining = end_time - time.time()
+
+            if time_remaining <= 0:
+                break
+
+            try:
+                message = await asyncio.wait_for(receive_messages().__anext__(), timeout=0.1)
                 print("Received message:", message)
                 data = json.loads(message)
                 if data['type'] == 'stop_recording':
@@ -308,7 +321,7 @@ async def start_recording():
                     break  # Exit the recording loop
                 elif data['type'] == 'button_click':
                     pin = data['pin']
-                    timestamp = round(time.time() - start_time,2)  # Calculate the timestamp relative to the start time
+                    timestamp = round(time.time() - start_time, 2)  # Calculate the timestamp relative to the start time
                     distortion = distortion_value
                     reverb = reverb_value
                     recorded_sounds.append((pin, timestamp, distortion, reverb))
@@ -317,17 +330,15 @@ async def start_recording():
                     # Handle incoming reverb value update
                     reverb_value = data['value']
                     print("Received reverb value:", reverb_value)
-                    # Implement logic to update reverb value processing here
                 elif data['type'] == 'distortion':
                     # Handle incoming distortion value update
                     distortion_value = data['value']
                     print("Received distortion value:", distortion_value)
+            except asyncio.TimeoutError:
+                continue  # No message received within the timeout, continue checking
 
             # Sort the recorded sounds by timestamp in ascending order
             recorded_sounds.sort(key=lambda x: x[1])
-            
-            # Sleep for a short interval before checking again
-            await asyncio.sleep(0.1)
 
         # Stop recording if the time limit has been reached
         await stop_recording()
@@ -392,6 +403,8 @@ async def play_recorded_sound(pin, distortion, reverb):
 
 
 async def main():
+    global sound_files
+    
     await asyncio.gather(
         websockets.serve(handle_message, "0.0.0.0", 8765),
         detect_button_clicks(),

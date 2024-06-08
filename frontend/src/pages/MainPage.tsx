@@ -72,7 +72,7 @@ const MainPage = () => {
 
 	const fetchSounds = async (searchQuery: string) => {
 		try {
-			const apiKey = 'Aj9x06vq60VC37YLo9psCPwzvEIyTu0eBQfphtoz';
+			const apiKey = 'm99fa8UWYOTO1czLtiYghQms0mICeoL8UoZHn5Yy';
 			const queryParams = new URLSearchParams({
 				query: searchQuery,
 				fields: 'id,name,bitrate,images,previews,tags',
