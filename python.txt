@@ -10,6 +10,8 @@ import numpy as np
 import time
 import aiohttp
 import aiofiles
+from pydub import AudioSegment
+import wave
 
 # Initialize Pygame mixer
 pygame.mixer.init(frequency=44100, size=-16, channels=2)
@@ -26,12 +28,13 @@ stop_requested = False
 recording = False
 recorded_sounds = []
 recording_event = asyncio.Event()
+sound_tasks = []  # List to hold tasks for the current sound
 
 # Set I2C bus number
 I2C_BUS_NUM = 1
 # Create an ADS1115 ADC object at address 0x48
 adc = ADS1115(address=0x48, busnum=I2C_BUS_NUM)
-# Set the gain to Ä‚â€šĂ‚Â±4.096V (adjust if needed)
+# Set the gain to Ă„â€šĂ˘â‚¬ĹˇÄ‚â€šĂ‚Â±4.096V (adjust if needed)
 GAIN = 1
 
 async def handle_message(websocket):
@@ -102,22 +105,32 @@ async def broadcast_assigned_sounds():
 
 async def download_sound(pin, sound_url):
     global sound_files
-    sound_file_path = f"sound_{pin}.mp3"
+    mp3_file_path = f"sound_{pin}.mp3"
+    wav_file_path = f"sound_{pin}.wav"
 
-    if os.path.exists(sound_file_path):
-        os.remove(sound_file_path)
+    if os.path.exists(mp3_file_path):
+        os.remove(mp3_file_path)
+    if os.path.exists(wav_file_path):
+        os.remove(wav_file_path)
 
     async with aiohttp.ClientSession() as session:
         async with session.get(sound_url) as response:
             if response.status == 200:
-                async with aiofiles.open(sound_file_path, 'wb') as f:
+                async with aiofiles.open(mp3_file_path, 'wb') as f:
                     await f.write(await response.read())
-                sound_files[pin] = sound_file_path
+                
+                # Convert MP3 to WAV
+                sound = AudioSegment.from_mp3(mp3_file_path)
+                sound.export(wav_file_path, format="wav")
+                
+                sound_files[pin] = wav_file_path
             else:
                 print(f"Failed to retrieve sound file from {sound_url}. Status code: {response.status}")
-        
+
+delete_tasks = 0
+
 async def button_click(pin):
-    global button_pressed, adc
+    global button_pressed, adc, playing_sounds, delete_tasks
 
     if button_pressed[pin]:
         return
@@ -136,6 +149,7 @@ async def button_click(pin):
     if pin in playing_sounds:
         playing_sounds[pin].stop()
         del playing_sounds[pin]
+        delete_tasks = pin
 
     if assigned_sounds[pin] is not None:
         await play_sound(pin)
@@ -165,56 +179,109 @@ async def apply_reverb(sound_array, reverb_level):
     return sound_with_reverb
 
 async def play_sound(pin):
-    global sound_files, playing_sounds, adc, reverb_value, distortion_value
+    global sound_files, playing_sounds, adc, reverb_value, distortion_value, sound_tasks, delete_tasks, button_press_interrupted
 
     sound_file_path = sound_files.get(pin)
-    if sound_file_path:
-        # Load the sound file
-        sound = pygame.mixer.Sound(sound_file_path)
-        sound_array = pygame.sndarray.array(sound).astype(np.float32) / 32767.0  # Normalize to [-1, 1]
+    if not sound_file_path:
+        return
+
+    chunk_size_seconds = 25  # Set chunk size to 25 seconds
+    chunk_size_frames = int(pygame.mixer.get_init()[0] * chunk_size_seconds)
+
+    wf = wave.open(sound_file_path, 'rb')
+    sample_width = wf.getsampwidth()
+    n_channels = wf.getnchannels()
+    sample_rate = wf.getframerate()
+    duration = wf.getnframes() / sample_rate
+
+    print("Duration:", duration)  # Debug message
+
+    detect_button_task = None  # Declare detect_button_task outside the if block
+    button_press_interrupted = False  # Flag to indicate if a button press interrupted playback
+
+    try:
+        if duration > 90:
+            chunk_size_seconds = 25  # Set chunk size to 25 seconds
+            chunk_size_frames = int(sample_rate * chunk_size_seconds)
+
+            # Start a task to continuously detect button clicks
+            detect_button_task = asyncio.create_task(detect_button_clicks())
+
+            while True:
+                # Check if a new button is clicked while the sound is playing
+                print(pin, playing_sounds, button_pressed, delete_tasks)
+                if button_pressed[pin] and delete_tasks == pin:
+                    print("Button pressed while playing sound")
+                    button_press_interrupted = True  # Set the flag
+                    for task in sound_tasks:
+                        sound_tasks.remove(task)
+                    print(sound_tasks)
+                    break
+
+                sound_chunk = wf.readframes(chunk_size_frames)
+                if not sound_chunk:
+                    break  # Exit the loop when the end of the file is reached
+
+                sound_array = np.frombuffer(sound_chunk, dtype=np.int16).astype(np.float32) / 32767.0  # Normalize to [-1, 1]
+
+                if len(sound_array.shape) == 1 and n_channels == 2:
+                    sound_array = np.stack([sound_array, sound_array], axis=-1)
+                elif len(sound_array.shape) == 2 and sound_array.shape[1] != n_channels:
+                    if n_channels == 1:
+                        sound_array = sound_array.mean(axis=1)
+                    else:
+                        sound_array = np.stack([sound_array.mean(axis=1)] * n_channels, axis=-1)
+
+                pygame_sound = pygame.mixer.Sound(buffer=sound_chunk)
+                pygame_sound.play()
+
+                playing_sounds[pin] = pygame_sound
+                print(playing_sounds)
+                await asyncio.sleep(chunk_size_seconds)
+
+                # Add the current playback task to the sound_tasks list
+                sound_task = asyncio.create_task(play_chunk(pygame_sound, asyncio.Event()))  # Pass a cancellation token
+                sound_tasks.append(sound_task)
+                
+
+                # Check if the button press was interrupted
+                if button_press_interrupted:
+                    break  # Exit the loop if the button press was interrupted
+                    
+                # Check for task cancellation after each iteration
+                for task in sound_tasks:
+                    if task.done() and task.cancelled():
+                        break  # Exit the loop if a task is cancelled
+        else:
+            await play_recorded_sound(pin, distortion_value, reverb_value)  # Default chunk size if duration <= 90 seconds
+    finally:
+        wf.close()
+        print("Sound playback completed")
+
+        # Cancel the detect_button_task after playing the sound
+        if detect_button_task is not None:
+            detect_button_task.cancel()
+
+        # Cancel all the sound playback tasks if the sound is above 90 seconds and being replayed
+        if duration > 90:
+            print("Cancelling sound tasks")
+            for task in sound_tasks:
+                task.cancel()
+            print(sound_tasks)
         
-        # Ensure the array matches the mixer channels
-        mixer_channels = pygame.mixer.get_init()[2]
-        if len(sound_array.shape) == 1 and mixer_channels == 2:
-            # Mono to stereo
-            sound_array = np.stack([sound_array, sound_array], axis=-1)
-        elif len(sound_array.shape) == 2 and sound_array.shape[1] != mixer_channels:
-            # Stereo to mono
-            if mixer_channels == 1:
-                sound_array = sound_array.mean(axis=1)
-            else:
-                sound_array = np.stack([sound_array.mean(axis=1)] * mixer_channels, axis=-1)
-        
-        # Apply distortion effect if the distortion level is above 0
-        if distortion_value > 0:
-            distortion_level = distortion_value / 100  # Scale to [0, 1]
-            print("Distortion level:", distortion_level)
-            sound_array = np.clip(sound_array * (1 + distortion_level * 10), -1, 1)  # Increase distortion effect
-        
-        # Convert back to int16 for pygame sound
-        sound_array_int16 = (sound_array * 32767).astype(np.int16)
-        sound_array_int16 = np.ascontiguousarray(sound_array_int16)  # Ensure the array is C-contiguous
-        
-        # Create and play the processed sound
-        processed_sound = pygame.sndarray.make_sound(sound_array_int16)
-        processed_sound.play()
-        
-        playing_sounds[pin] = processed_sound
-        
-        # Apply reverb effect if the reverb level is above 0
-        if reverb_value > 0:
-            reverb_level = reverb_value / 100.0  # Scale to [0, 1]
-            sound_array_with_reverb = await apply_reverb(sound_array, reverb_level)
-            
-            # Convert back to int16 for pygame sound
-            sound_array_with_reverb_int16 = (sound_array_with_reverb * 32767).astype(np.int16)
-            sound_array_with_reverb_int16 = np.ascontiguousarray(sound_array_with_reverb_int16)  # Ensure the array is C-contiguous
-            
-            # Create and play the processed sound with reverb
-            processed_sound_with_reverb = pygame.sndarray.make_sound(sound_array_with_reverb_int16)
-            processed_sound_with_reverb.play()
-            
-            playing_sounds[pin] = processed_sound_with_reverb
+        # Clear the sound_tasks list
+        sound_tasks.clear()
+
+
+async def play_chunk(pygame_sound, cancellation_token):
+    # Play the current chunk
+    pygame_sound.play()
+
+    # Wait until the sound finishes playing or is canceled
+    while pygame.mixer.get_busy():
+        if cancellation_token.is_set():
+            break
+        await asyncio.sleep(0.1)
 
 async def button_release(pin):
     global button_pressed

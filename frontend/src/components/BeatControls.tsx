@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { FaPlay, FaPause, FaStop, FaRedo, FaSquare } from 'react-icons/fa';
+import { FaPlay, FaPause, FaStop, FaRedo } from 'react-icons/fa';
 
 type Sound = {
   id: number;
@@ -52,8 +52,8 @@ const BeatControls = ({ socket, assignedSounds }: BeatControlsProps) => {
     timerRef.current = window.setInterval(() => {
       setTimerValue((prevValue) => {
         const newValue = prevValue + 10;
-        if (newValue >= 10000) {
-          console.log('Timer reached 10000 ms, stopping timer...');
+        if (newValue >= 120000) { // 2 minutes in milliseconds
+          console.log('Timer reached 120000 ms (2 minutes), stopping timer...');
           pauseTimer();
           setTimerValue(0);
           setAxisPosition(0);
@@ -114,9 +114,10 @@ const BeatControls = ({ socket, assignedSounds }: BeatControlsProps) => {
   }, [socket, timerValue]);
 
   const formatMilliseconds = (ms: number): string => {
-    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
     const milliseconds = (ms % 1000).toString().padStart(3, '0');
-    return `${seconds}.${milliseconds} s`;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}.${milliseconds} s`;
   };
 
   return (
@@ -129,12 +130,12 @@ const BeatControls = ({ socket, assignedSounds }: BeatControlsProps) => {
           <div
             key={index}
             className="button-indicator"
-            style={{ left: `${(button.time / 10000) * 100}%` }}
+            style={{ left: `${(button.time / 120000) * 100}%` }} // Adjust for 2 minutes
           ></div>
         ))}
         <div
           className="timer-axis-display"
-          style={{ left: `${(axisPosition / 10000) * 100}%` }}
+          style={{ left: `${(axisPosition / 120000) * 100}%` }} // Adjust for 2 minutes
         ></div>
       </div>
       <div className="playback-controls">
