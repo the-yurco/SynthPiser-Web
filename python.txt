@@ -17,6 +17,7 @@ import wave
 pygame.mixer.init(frequency=44100, size=-16, channels=2)
 
 button_pins = [5, 6, 13, 19, 26, 16, 20, 21, 4, 17, 27, 22, 24, 25, 23, 18]
+toggle_recording_pin = 12
 assigned_sounds = {pin: None for pin in button_pins}
 sound_files = {}
 playing_sounds = {}
@@ -156,6 +157,17 @@ async def button_click(pin):
 
     if sound_files.get(pin):
         await broadcast_button_click(pin)
+
+async def monitor_toggle_button():
+    global recording
+    while True:
+        if GPIO.input(toggle_recording_pin) == GPIO.LOW:
+            if recording:
+                await stop_recording()
+            else:
+                await start_recording()
+            await broadcast_recording_state()  # Send the recording state to the frontend
+        await asyncio.sleep(0.01)
 
 def adjust_reverb_level(percent_reverb_value):
     # Apply a nonlinear scaling function to compress the range of lower values more aggressively
@@ -342,12 +354,20 @@ async def receive_messages():
             except websockets.exceptions.ConnectionClosed:
                 connected_clients.remove(ws)
                 break
+            
+async def broadcast_recording_state():
+    global recording, connected_clients
+    await asyncio.gather(
+        *[ws.send(json.dumps({'type': 'recording_state', 'recording': recording})) for ws in connected_clients]
+    )
 
 async def start_recording():
     global recording, recorded_sounds, stop_requested, distortion_value, reverb_value
 
     print("Recording started...")
     recording = True
+    recording_event.clear()
+    await broadcast_recording_state() 
     start_time = time.time()  # Record the start time of the recording
     end_time = start_time + 120  # Set the end time to 2 minutes from the start time
 
@@ -411,6 +431,7 @@ async def stop_recording():
 
     # You can process or save the recorded sounds here
     print("Recorded sounds:", recorded_sounds)
+    await broadcast_recording_state()
 
 async def play_recorded_sounds(start_time):
     global recorded_sounds
@@ -455,11 +476,14 @@ async def play_recorded_sound(pin, distortion, reverb):
 
 async def main():
     global sound_files
+
+    GPIO.setup(toggle_recording_pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
     
     await asyncio.gather(
         websockets.serve(handle_message, "0.0.0.0", 8765),
         detect_button_clicks(),
         read_potentiometer(),
+        monitor_toggle_button()
     )
 
 async def broadcast_button_click(pin):
