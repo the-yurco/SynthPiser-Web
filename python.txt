@@ -178,8 +178,13 @@ async def apply_reverb(sound_array, reverb_level):
 
     return sound_with_reverb
 
+async def play_chunk(sound, cancellation_token):
+    while not cancellation_token.is_set():
+        await asyncio.sleep(0.1)
+    sound.stop()
+
 async def play_sound(pin):
-    global sound_files, playing_sounds, adc, reverb_value, distortion_value, sound_tasks, delete_tasks, button_press_interrupted
+    global sound_files, playing_sounds, adc, reverb_value, distortion_value, sound_tasks, delete_tasks
 
     sound_file_path = sound_files.get(pin)
     if not sound_file_path:
@@ -197,7 +202,7 @@ async def play_sound(pin):
     print("Duration:", duration)  # Debug message
 
     detect_button_task = None  # Declare detect_button_task outside the if block
-    button_press_interrupted = False  # Flag to indicate if a button press interrupted playback
+    cancellation_token = asyncio.Event()
 
     try:
         if duration > 90:
@@ -212,10 +217,7 @@ async def play_sound(pin):
                 print(pin, playing_sounds, button_pressed, delete_tasks)
                 if button_pressed[pin] and delete_tasks == pin:
                     print("Button pressed while playing sound")
-                    button_press_interrupted = True  # Set the flag
-                    for task in sound_tasks:
-                        sound_tasks.remove(task)
-                    print(sound_tasks)
+                    cancellation_token.set()
                     break
 
                 sound_chunk = wf.readframes(chunk_size_frames)
@@ -237,21 +239,13 @@ async def play_sound(pin):
 
                 playing_sounds[pin] = pygame_sound
                 print(playing_sounds)
-                await asyncio.sleep(chunk_size_seconds)
 
                 # Add the current playback task to the sound_tasks list
-                sound_task = asyncio.create_task(play_chunk(pygame_sound, asyncio.Event()))  # Pass a cancellation token
+                sound_task = asyncio.create_task(play_chunk(pygame_sound, cancellation_token))
                 sound_tasks.append(sound_task)
-                
+                print(sound_tasks)
 
-                # Check if the button press was interrupted
-                if button_press_interrupted:
-                    break  # Exit the loop if the button press was interrupted
-                    
-                # Check for task cancellation after each iteration
-                for task in sound_tasks:
-                    if task.done() and task.cancelled():
-                        break  # Exit the loop if a task is cancelled
+                await asyncio.sleep(chunk_size_seconds)
         else:
             await play_recorded_sound(pin, distortion_value, reverb_value)  # Default chunk size if duration <= 90 seconds
     finally:
@@ -265,23 +259,13 @@ async def play_sound(pin):
         # Cancel all the sound playback tasks if the sound is above 90 seconds and being replayed
         if duration > 90:
             print("Cancelling sound tasks")
+            cancellation_token.set()
             for task in sound_tasks:
                 task.cancel()
             print(sound_tasks)
         
         # Clear the sound_tasks list
         sound_tasks.clear()
-
-
-async def play_chunk(pygame_sound, cancellation_token):
-    # Play the current chunk
-    pygame_sound.play()
-
-    # Wait until the sound finishes playing or is canceled
-    while pygame.mixer.get_busy():
-        if cancellation_token.is_set():
-            break
-        await asyncio.sleep(0.1)
 
 async def button_release(pin):
     global button_pressed
